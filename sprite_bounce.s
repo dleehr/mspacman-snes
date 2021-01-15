@@ -204,22 +204,21 @@ CheckUp:
     ; ;B, Select, Start, Up, Down, Left, Right
     lda JOY1AW
     and #$08        ; Check the Up flag
-    bne CheckDown   ; up is not pressed, check down
+    beq CheckDown
     ; up was pressed....
     lda #$ff        ; -1 means dig up, stupid
     sta VER_SPEED
-    jmp CheckLeft
 CheckDown:
     lda JOY1AW
     and #$04        ; Check Down
-    bne CheckLeft   ; Down not pressed, keep checking
+    beq CheckLeft   ; Down not pressed, keep checking
     ; down pressed
     lda #$01        ; down pressed, dig down
     sta VER_SPEED
 CheckLeft:
     lda JOY1AW
     and #$02        ; Check left
-    bne CheckRight  ; Left no pressed, check the last one
+    beq CheckRight  ; Left no pressed, check the last one
     ; Left pressed
     lda #$ff        ; -1, go left
     sta HOR_SPEED
@@ -227,7 +226,7 @@ CheckLeft:
 CheckRight:
     lda JOY1AW
     and #$01        ; Check right
-    bne LeftBoundaryCheck   ; right not pressed, nothing left to check
+    beq LeftBoundaryCheck   ; right not pressed, nothing left to check
     lda #$01        ; +1, go right
     sta HOR_SPEED
     ; game logic: move the sprites
