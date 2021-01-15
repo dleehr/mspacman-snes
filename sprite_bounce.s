@@ -208,13 +208,17 @@ CheckUp:
     ; up was pressed....
     lda #$ff        ; -1 means dig up, stupid
     sta VER_SPEED
+    jmp CheckLeft
 CheckDown:
     lda JOY1AW
     and #$04        ; Check Down
-    beq CheckLeft   ; Down not pressed, keep checking
+    beq VertStill   ; Down not pressed either, clear speed
     ; down pressed
     lda #$01        ; down pressed, dig down
     sta VER_SPEED
+    jmp CheckLeft
+VertStill:
+    stz VER_SPEED
 CheckLeft:
     lda JOY1AW
     and #$02        ; Check left
@@ -226,9 +230,12 @@ CheckLeft:
 CheckRight:
     lda JOY1AW
     and #$01        ; Check right
-    beq LeftBoundaryCheck   ; right not pressed, nothing left to check
+    beq HorzStill   ; right not pressed, make horizontally still
     lda #$01        ; +1, go right
     sta HOR_SPEED
+    jmp LeftBoundaryCheck
+HorzStill:
+    stz HOR_SPEED
     ; game logic: move the sprites
     ; move sprite 1 horizontally
     ; check collision left boundary
