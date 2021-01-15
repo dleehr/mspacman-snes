@@ -14,8 +14,11 @@ CGADD       = $2121     ; address for CGRAM read/write
 CGDATA      = $2122     ; Data for CGRAM write
 TM          = $212c     ; main screen designation
 NMITIMEN    = $4200     ; enable flag for v-blank
+IOPORTW     = $4201     ; IO Port Write Register for joy
 MDMAEN      = $420b     ; DMA Enable Register
 RDNMI       = $4210     ; Read the NMI flag status
+JOY1A       = $4219     ; Joypad 1 status
+JOY1B       = $4218     ; Joypad 1 status
 DMAP0       = $4300     ; DMA Control register, channel 0
 BBAD0       = $4301     ; DMA Destination register, channel 0
 A1T0L       = $4302     ; DMA Source address register low, channel 0
@@ -31,6 +34,10 @@ VER_SPEED   = $0301     ; the vertical speed
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM
 ; ---
 
+; --- Joypad memory locations
+JOY1AW      = $0500     ;B, Select, Start, Up, Down, Left, Right
+JOY1BW      = $0501     ;A, X, L, R, iiii-ID
+
 ; --- Game Constants
 ; Use these to check for collisions with screen boundaries
 SCREEN_LEFT     = $00   ; left screen boundary = 0
@@ -38,7 +45,7 @@ SCREEN_RIGHT    = $ff   ; right screen boundary = 255
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 ; simple constant to define sprite movement speed
-SPRITE_SPEED    = $02   ; sprites will move 2 pixels per frame
+SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
 SPRITE_SIZE     = $08   ; sprites are 8 by 8 pixels
 OAMMIRROR_SIZE  = $0220 ; OAMRAM can hold 128 spites, 4 bytes each (oh right, this is just the object attributes - x, y, name, flip/prio/palette)
@@ -171,10 +178,13 @@ OAMLoop:
     ; enable NMI, turn on automatic joypad polling
     lda #$81
     sta NMITIMEN
+    lda #$c0     ;have the automatic read of the SNES read the first pair of JoyPads
+    sta IOPORTW  ;store to io port write rgister
 
     jmp GameLoop        ; all init is done
 .endproc
 ; ---
+
 
 ; ---
 ; after reset handler will jump to here
@@ -182,11 +192,48 @@ OAMLoop:
 ; .smart ; keep track of registers widths
 .proc GameLoop
     wai              ; wait for NMI/V-Blank
-
     .byte $42, $00
+    ; Check joypad
+Joypad:
+    lda JOY1A
+    sta JOY1AW
+    lda JOY1B
+    sta JOY1BW
+    ; Check up/down direction
+CheckUp:
+    ; ;B, Select, Start, Up, Down, Left, Right
+    lda JOY1AW
+    and #$08        ; Check the Up flag
+    bne CheckDown   ; up is not pressed, check down
+    ; up was pressed....
+    lda #$ff        ; -1 means dig up, stupid
+    sta VER_SPEED
+    jmp CheckLeft
+CheckDown:
+    lda JOY1AW
+    and #$04        ; Check Down
+    bne CheckLeft   ; Down not pressed, keep checking
+    ; down pressed
+    lda #$01        ; down pressed, dig down
+    sta VER_SPEED
+CheckLeft:
+    lda JOY1AW
+    and #$02        ; Check left
+    bne CheckRight  ; Left no pressed, check the last one
+    ; Left pressed
+    lda #$ff        ; -1, go left
+    sta HOR_SPEED
+    jmp LeftBoundaryCheck
+CheckRight:
+    lda JOY1AW
+    and #$01        ; Check right
+    bne LeftBoundaryCheck   ; right not pressed, nothing left to check
+    lda #$01        ; +1, go right
+    sta HOR_SPEED
     ; game logic: move the sprites
     ; move sprite 1 horizontally
     ; check collision left boundary
+LeftBoundaryCheck:
     lda HOR_SPEED
     bpl RightBoundaryCheck  ; if speed is positive, sprites are moving right so don't check left boundary check
     lda OAMMIRROR           ; load the horizontal position of the first sprite, which is the first byte at OAMMIRROR
