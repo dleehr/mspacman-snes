@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-def load(char_file='mspacman.chr'):
+import sys
+
+def load(char_file):
     with open(char_file, 'r') as f:
         rows = f.readlines()
         rows = [r.strip() for r in rows if r]
@@ -28,11 +30,11 @@ def to_plane(rows, start):
             byte = int(bitplane, 2)
             yield byte.to_bytes(1, byteorder='little')
 
-def write(rows, filename='Sprites.vra'):
+def write(rows, filename):
     # strip out empty rows
     rows = [r for r in rows if r]
     chunks = chunk8(rows)
-    with open('Sprites.vra', 'wb') as f:
+    with open(filename, 'wb') as f:
         for chunk in chunks:
             print(chunk)
             for byte in to_plane(chunk, 3):
@@ -40,9 +42,15 @@ def write(rows, filename='Sprites.vra'):
             for byte in to_plane(chunk, 1):
                 f.write(byte)
 
+def check_args():
+    if not len(sys.argv) == 3:
+        print('Usage: ', sys.argv[0], 'input.chr output.vra')
+        sys.exit(1)
+
 def main():
-    rows = load()
-    write(rows)
+    check_args()
+    rows = load(sys.argv[1])
+    write(rows, sys.argv[2])
 
 if __name__ == '__main__':
     main()
