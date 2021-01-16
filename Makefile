@@ -1,10 +1,10 @@
-sprite_bounce.smc: sprite_bounce.o memmap.cfg
-	ld65 -C memmap.cfg -o sprite_bounce.smc sprite_bounce.o
+mspacman.smc: mspacman.o memmap.cfg
+	ld65 -C memmap.cfg -o mspacman.smc mspacman.o
 
-sprite_bounce.o: sprite_bounce.s
-	ca65 --cpu 65816 -s -o sprite_bounce.o sprite_bounce.s
+mspacman.o: mspacman.s
+	ca65 --cpu 65816 -s -o mspacman.o mspacman.s
 
 .PHONY: clean
 
 clean:
-	rm -f sprite_bounce.o sprite_bounce.smc
+	rm -f mspacman.o mspacman.smc
