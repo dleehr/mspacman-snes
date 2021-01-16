@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
 import sys
+import re
+
+def strip(row):
+    row = row.split(';')[0] # strip comments
+    return row.strip() # strip whitespace and trailing \n
 
 def load(char_file):
     with open(char_file, 'r') as f:
         rows = f.readlines()
-        rows = [r.strip() for r in rows if r]
+        rows = [strip(row) for row in rows if row]
         return rows
 
 def chunk8(rows):
