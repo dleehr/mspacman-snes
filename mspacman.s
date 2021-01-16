@@ -79,6 +79,15 @@ ColorData:  .incbin "SpriteColors.pal"
     ldx #$1fff
     txs             ; copy x to stack pointer
 
+    ; load color data into CGRAM - palettes
+    tsx             ; save current stack pointer (is this a no-op from before?)
+    lda #$80        ; push CGRAM destination address to stack
+    pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
+    pea ColorData   ; Push paletes source address to stack
+    pea $0030       ; push count of bytes (48 / $30) to transfer to stack (currently only using 38)
+    jsr LoadCGRAM   ; transfer color data into CGRAM
+    txs             ; "delete" data on stack by restoring old stack pointer
+
     ; load sprites into VRAM
     tsx             ; save current stack pointer
     pea $0000       ; push VRAM destination address to stack (is this a memory map offset thing later?)
@@ -92,19 +101,10 @@ ColorData:  .incbin "SpriteColors.pal"
     ; Since these are right after the sprites, could just icnrease the count above
     ; but I want to understand it
     tsx
-    pea $0080       ; push VRAM destination address - start where the old one left off
+    pea $0040       ; push VRAM destination address - start where the old one left off
     pea WallData    ; wall tiles source address
     pea $0040       ; count of bytes (64) to transfer. just 2 tiles for now
     jsr LoadVRAM    ; transfer data in subroutine
-    txs             ; "delete" data on stack by restoring old stack pointer
-
-    ; load color data into CGRAM - palettes
-    tsx             ; save current stack pointer (is this a no-op from before?)
-    lda #$80        ; push CGRAM destination address to stack
-    pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
-    pea ColorData   ; Push paletes source address to stack
-    pea $0030       ; push count of bytes (48 / $30) to transfer to stack (currently only using 38)
-    jsr LoadCGRAM   ; transfer color data into CGRAM
     txs             ; "delete" data on stack by restoring old stack pointer
 
     ; set up initial data in OAMRAM mirror, using X as index
@@ -179,7 +179,6 @@ OAMLoop:
     sta HOR_SPEED
     sta VER_SPEED
 
-    ; .byte $42, $00        ; debugger breakpoint
 
     ; make objects visible
     lda #$10
@@ -204,7 +203,6 @@ OAMLoop:
 ; .smart ; keep track of registers widths
 .proc GameLoop
     wai              ; wait for NMI/V-Blank
-    .byte $42, $00
     ; Check joypad
 Joypad:
     lda JOY1A
@@ -366,6 +364,7 @@ UpdateOtherSprites:
 ; params: NumBytes: .byte, SrcPointer: .addr, DestPointer: .addr
 ; ---
 .proc   LoadVRAM
+        .byte $42, $00  ; breakdance
         phx         ; save old stack pointer that was transferred to x
         ; create frame pointer
         phd         ; push direct register to stack
@@ -411,7 +410,6 @@ VRAMLoop:
         phd                     ; push direct register to stack
         tsc                     ; transfer stack to ...
         tcd                     ; direct register
-        .byte $42, $00
         ; constants to access args on stack with direct addressing
         NumBytes    = $07       ; number of bytes to transfer
         SrcPointer  = $09       ; source address of sprite data
