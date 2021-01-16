@@ -91,7 +91,7 @@ ColorData:  .incbin "SpriteColors.pal"
     lda #$80        ; push CGRAM destination address to stack
     pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
     pea ColorData   ; Push paletes source address to stack
-    pea $0020       ; push count of bytes (32 / $20) to transfer to stack
+    pea $0030       ; push count of bytes (48 / $30) to transfer to stack (currently only using 38)
     jsr LoadCGRAM   ; transfer color data into CGRAM
     txs             ; "delete" data on stack by restoring old stack pointer
 
