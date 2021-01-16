@@ -83,3 +83,15 @@ https://www.vg-resource.com/thread-28888.html
 
 so the output tiles easily fit in single text character per pixel (0-f). it's the OAM or background  table that maps a tile to a palette.
 
+
+
+tiles are 4 bpp, and these are 8x8 pixels
+64 pixels, 256 bits
+8 bytes
+
+
+in the ROM, they're all aligned, but once I copy to VRAM there's extra junk in front
+
+address of bow is 8300
+That makes sense - ROM0 starts at 8000 and code is mapped first
+address of elbow in ROM is 8380
