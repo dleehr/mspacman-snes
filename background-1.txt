@@ -1,0 +1,50 @@
+Tile Map
+
+https://en.wikibooks.org/wiki/Super_NES_Programming/Graphics_tutorial
+
+The map is a 2 dimensional array (32x32, 64x32, 32x64 or 64x64) of tile indexes. The SNES goes through the array and for each index in the map renders a tile specified in the array. Since tiles can be either 8x8 or 16x16 pixels, we can end up with background image dimensions ranging from 256 to 1024 pixels (size_of_map * size_of_tile).
+
+A member of an array is a two bytes long structure(two bytes long = 16 bits):
+
+High byte Low byte
+
+vhopppcc cccccccc
+
+c is the index of a tile in the tileset (tileset is specified per BG), SNES will get the address of a tile as (base_tileset_bits << 13) + (8 * color_depth * tile_number)
+h: horizontal flip
+v: vertical flip
+p: palette number
+o: priority bit
+Use registers $2107-$210A to set map for your background.
+
+Structure of registers $2107-$210A
+
+aaaaaass
+
+a: address of the map in VRAM. Multiply the number by 2048 (or shift 11 bits) in order to get the byte location of the map.
+
+s: size of the map
+
+Sizes:
+
+* 00=32x32
+* 01=64x32
+* 10=32x64
+* 11=64x64
+
+
+
+1 top left corner round
+2 bottom left corner round (this can be flipped)
+3 top right corner round
+4 bottom right corner round
+
+(can snes background tiles be flipped - yes)
+
+
+2 top wall
+3 left edge wall
+4 squared top right corner
+5 squared top left corner
+
+
