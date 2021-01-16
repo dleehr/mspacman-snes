@@ -58,6 +58,7 @@ OAMMIRROR_SIZE  = $0220 ; OAMRAM can hold 128 spites, 4 bytes each (oh right, th
 ; --- includes
 .segment "SPRITEDATA"
 SpriteData: .incbin "Sprites.vra"
+WallData:   .incbin "Walls.vra"
 ColorData:  .incbin "SpriteColors.pal"
 ; ---
 
