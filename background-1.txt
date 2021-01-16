@@ -48,3 +48,30 @@ Sizes:
 5 squared top left corner
 
 
+background colors
+10 000000 black
+11 fb0007 red border
+12 fda985 pink inner border
+13 d6d6d6 white
+
+Top left corner rounded (leaving off the 1)
+
+00001111
+00112222
+01222222
+01222111
+12221000
+12210000
+12210000
+12210000
+
+top wall
+
+11111111
+22222222
+22222222
+11111111
+00000000
+00000000
+00000000
+00000000
