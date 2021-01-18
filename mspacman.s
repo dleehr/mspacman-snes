@@ -66,7 +66,8 @@ OAMMIRROR_SIZE  = $0220 ; OAMRAM can hold 128 spites, 4 bytes each (oh right, th
 .segment "SPRITEDATA"
 SpriteData: .incbin "Sprites.vra"
 WallData:   .incbin "Walls.vra"
-ColorData:  .incbin "SpriteColors.pal"
+MsPacmanPalette:    .incbin "mspacman.pal"
+Level1Palette:      .incbin "level1.pal"
 ; ---
 
 .segment "CODE"
@@ -86,12 +87,21 @@ ColorData:  .incbin "SpriteColors.pal"
     ldx #$1fff
     txs             ; copy x to stack pointer
 
-    ; load color data into CGRAM - palettes
+    ; load background palette to CGRAM
+    tsx             ; save current stack pointer (is this a no-op from before?)
+    lda #$00        ; push CGRAM destination address to stack
+    pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
+    pea Level1Palette   ; Push paletes source address to stack
+    pea $0008       ; push count of bytes (8 / $08) to transfer to stack
+    jsr LoadCGRAM   ; transfer color data into CGRAM
+    txs             ; "delete" data on stack by restoring old stack pointer
+
+    ; load sprite palette to CGRAM
     tsx             ; save current stack pointer (is this a no-op from before?)
     lda #$80        ; push CGRAM destination address to stack
     pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
-    pea ColorData   ; Push paletes source address to stack
-    pea $0030       ; push count of bytes (48 / $30) to transfer to stack (currently only using 38)
+    pea MsPacmanPalette   ; Push paletes source address to stack
+    pea $0008       ; push count of bytes (8 / $08) to transfer to stack
     jsr LoadCGRAM   ; transfer color data into CGRAM
     txs             ; "delete" data on stack by restoring old stack pointer
 
