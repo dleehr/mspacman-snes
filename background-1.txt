@@ -95,3 +95,160 @@ in the ROM, they're all aligned, but once I copy to VRAM there's extra junk in f
 address of bow is 8300
 That makes sense - ROM0 starts at 8000 and code is mapped first
 address of elbow in ROM is 8380
+
+This is good info for backgrounds:
+https://wiki.superfamicom.org/working-with-vram-initializing-tiles-and-tile-maps
+
+!!VERY IMPORTANT!! Each address in VRAM is A WORD IN SIZE. I misunderstood this at one point and it screwed everything I thought I knew. SO REMEMBER, $0000 holds 2 bytes, low and high.
+
+
+Register $2105
+Screen mode register (1b/W)
+
+dcbapmmm    d: BG4 tile size    c: BG3 tile size    b: BG2 tile size
+            a: BG1 tile size    Sizes are: 0=8x8; 1=16x16. (See reg. $2107)
+            p: order of BG priorities   m: General screen mode
+
+MODE    # of BGs    Max Colors/Tile     Palettes        Colors Total
+0       4           4                   32 (8 per BG)   128 (32 per BG*4 BGs)
+1       3           BG1/BG2:16 BG3:4    8               BG1/BG2:128 BG3:32
+2       2           16                  8               128
+3       2           BG1:256 BG2:16      BG1:1 BG2:8     BG1:256 BG2:128
+4       2           BG1:256 BG2:4       BG1:1 BG2:8     BG1:256 BG2:32
+5       2           BG1:16 BG2:4        8               BG1:128 BG2:32(Interlaced)
+6       1           16                  8               128 (Interlaced mode)
+7       1           256                 1               256
+
+
+- to use
+
+dcba - sizes of tiles on bg 4321. 0=8x8, 1=16x16
+p: order of bg priorities
+mmm: mode 0-7
+
+I have 8x8 tiles, and only 4 colors per tile. My tiles are 4bpp so they COULD be up to 16. and I could use mode 1. But I'll stick with mode 0 I guess
+
+dcbapmmm
+00000000 - i can just stz to 2105
+
+stz $2105
+
+Register $2107
+
+BG1 Tile Map location
+
+aaaaaass
+a: Tile map address
+s: Screen size: 00=32x32 01=64x32 10=32x64 11=64x64
+
+we have 6 bits for the tile map address.
+
+Shift the bits we have address by $0A (10d) to get the address. they're in  $0400 increments, which is 1024.
+ah that makes sense. We want a 16-bit address but we only have 6 bits, so we shift by 10 bits.
+and MSB must be zero since we only have 64K of ram
+
+2108: BG2 tile map location
+2109: BG3 tile map location
+210A: BG4 Tile map location
+
+And for the screen size, I can just stick with 00 for 32x32.
+
+establish an address for tile maps
+
+lda #%xxxxxx00
+sta $2107
+
+210B: BG1 and BG2 character location
+
+aaaabbbb        a: Base address for BG2.
+                b: Base address for BG1.
+
+210C is BG3 and BG4
+
+Do these get shifted by $0C?
+YES!
+
+so, establish an address for BG1 characters. it'll be 32x32
+
+lda #%0000xxxx
+sta $210B
+
+In the example they used $0000 for the character map offset, since characters must be 1000 - aligned. Even though they covered tiles first.
+
+So just for the exercise of learning it, i'll put my background tiles at $0400 and my character data at $1000
+
+
+; lda #%00000100
+lda #$04
+sta $2107
+
+
+Character data
+lda #$01
+sta $210B
+
+Register $212C
+---abcde            a: Sprites disable/enable.
+                    b: Disable/enable BG4.
+                    c: Disable/enable BG3.
+                    d: Disable/enable BG2.
+                    e: Disable/enable BG1.
+
+lda #%00010001
+sta $212C       ; enable BG1 and sprites. I think I already have a line for this
+
+TILE MAP FORMAT
+
+Each entry in the Tile Map is worth 2 bytes. Here's the format:
+
+High        Low                 v: vertical flip    h: horizontal flip
+vhopppcc    cccccccc            o: priority bit     p: palette number
+                                c: Starting character (tile) number
+
+now some character data to load
+
+3 bits for palette
+
+but my existing code has the palette starting at 80
+- maybe because I'm just using 8 palettes?
+- is this banked? maybe it's banked
+- It didn't work when I set the CGRAM offset to 00.
+- but the palette debugger did show my palette at the top.
+- maybe it depends on the display mode
+
+high
+vhopppcc
+00000100
+lda #%
+
+low
+cccccccc
+00000001
+
+so how do I populate character data?
+
+VMADDL      = $2116     ; address (Low) for VRAM write
+VMADDH      = $2117     ; high
+VMDATAL     = $2118     ; Data (low) for vram write
+VMDATAH     = $2119     ; high
+
+    low       high
+00000100 00000000 ; top-left elbow 40
+00000100 00000001 ; top wall       41
+00000100 00000001 ; top wall       41
+01000100 00000000 ; flipped elbow  44
+
+
+putting character data starting at 0000
+ldx #$0000        ; we write to both with a 16-bit register
+stx VMADDL
+lda #$80          ;
+sta VMAINC        ; increment VRAM address by 1 when writing to VMDATAH
+ldx #$40          ; no flips, palette 1, top left elbow
+stx VMDATAH
+ldx #$41          ; no flips, palette 1, top wall
+stx VMDATAH
+ldx #$41          ; no flips, palette 1, top wall
+stx VMDATAH
+ldx #$44          ; h flip, palette 1, top left elbow
+stx VMDATAH
