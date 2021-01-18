@@ -5,6 +5,13 @@ OBJSEL      = $2101     ; Object size $ object data area designation
 OAMADDL     = $2102     ; Address (Low) for accessing OAM
 OAMADDH     = $2103     ; high
 OAMDATA     = $2104     ; data for OAM write
+BGMODE      = $2105     ; background screen mode
+BG1TMADD    = $2107     ; BG1 tile map location
+BG2TMADD    = $2108     ; BG2 tile map location
+BG3TMADD    = $2109     ; BG3 tile map location
+BG4TMADD    = $210A     ; BG4 tile map location
+BG12CADD    = $210B     ; BG1, BG2 Character location
+BG34CADD    = $210C     ; BG3, BG4 Character location
 VMAINC      = $2115     ; VRAM Address increment value designation
 VMADDL      = $2116     ; address (Low) for VRAM write
 VMADDH      = $2117     ; high
@@ -90,7 +97,7 @@ ColorData:  .incbin "SpriteColors.pal"
 
     ; load sprites into VRAM
     tsx             ; save current stack pointer
-    pea $0000       ; push VRAM destination address to stack (is this a memory map offset thing later?)
+    pea $2000       ; push VRAM destination address to stack (is this a memory map offset thing later?)
     pea SpriteData  ; push sprite source address to stack
     ; each tile is 0020. we have 4 tiles so that's 0080. really we're only using 2bpp
     pea $0080       ; push count of bytes (128 / $80) to transfer to stack
@@ -180,8 +187,8 @@ OAMLoop:
     sta VER_SPEED
 
 
-    ; make objects visible
-    lda #$10
+    ; make objects visible - and BG1!
+    lda #$11
     sta TM
     ; release forced blanking, set screen to full brightness
     lda #$0f
@@ -469,6 +476,38 @@ CGRAMLoop:
         rts
 .endproc
 ;---
+
+.proc LoadBG
+    phx ; save x
+    phd ; create frame pointer
+    tsc
+    tcd
+SetupBGLocations:
+    stz BGMODE   ; Mode 0, 8x8 tiles
+    lda #$04     ; tile map starting location in vram ...
+    sta BG1TMADD ; ...00000100 becomes $0400 in VRAM
+    lda #$01     ; character map starting location in vram...
+    sta BG12CADD ; ...lower 4 bits are for BG1, becomes $1000 in VRAM
+LoadTileData:
+    ; this happens in LoadVRAM
+LoadChrData:
+    ldx #$0000        ; we write to both VMADDL and VMADDH with a 16-bit register
+    stx VMADDL
+    lda #$80          ;
+    sta VMAINC        ; increment VRAM address by 1 when writing to VMDATAH
+    ldx #$40          ; no flips, palette 1, top left elbow
+    stx VMDATAH
+    ldx #$41          ; no flips, palette 1, top wall
+    stx VMDATAH
+    ldx #$41          ; no flips, palette 1, top wall
+    stx VMDATAH
+    ldx #$44          ; h flip, palette 1, top left elbow
+    stx VMDATAH
+DoneBG:
+    pld; restore frame pointer
+    plx; restore x
+    rts
+.endproc
 
 ;-------------------------------------------------------------------------------
 ;   Interrupt and Reset vectors for the 65816 CPU

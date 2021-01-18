@@ -252,3 +252,51 @@ ldx #$41          ; no flips, palette 1, top wall
 stx VMDATAH
 ldx #$44          ; h flip, palette 1, top left elbow
 stx VMDATAH
+
+
+
+Added my code, now trying to handle my palettes and OAMRAM
+
+From https://wiki.superfamicom.org/sprites:
+
+There are 8 16-color palettes available to sprites, starting at CGRAM index 128. Thus, the palette number 'ppp' in OAM indicates that colors 128+ppp16 through 128+ppp16+15 are available to this sprite. However, the first of these is always considered transparent, to allow for non-rectangular shaped sprites.
+
+looks like the +8 offset was because I was loading sprite palettes before. Now I'm loading background palettes, which are different
+
+
+Revisiting OAM table
+
+byte OBJ*4+0: xxxxxxxx
+byte OBJ*4+1: yyyyyyyy
+byte OBJ*4+2: cccccccc
+byte OBJ*4+3: vhoopppN
+
+
+
+cccccccc  = First tile of the sprite.^^
+N         = Name table of the sprite. See below for the calculation of the VRAM address.
+ppp       = Palette of the sprite. The first palette index is 128+ppp*16.
+oo        = Sprite priority. See below for details.
+h/v       = Horizontal/Vertical flip flags.^^^
+s         = Sprite size flag. See below for details
+
+
+When I had lines like
+
+    lda #$00            ; sprite 1, name is 00
+
+This was for byte OBJ*4+2
+
+^^See below for the calculation of the VRAM address. Note that this could also be considered as 'rrrrcccc' specifying the row and column of the tile in the 16x16 character table.
+
+Character table in VRAM
+Sprites have two 16x16 tile character tables in VRAM. Wrapping on these works much like for BG tilemaps: tile 0 is to the right of tile $0F and below tile $F0, tile $10 is below tile 0 and to the right of tile $1F, tile $FF is to the left of tile $F0 and above tile $0F, and so on.
+
+As far as sprite table locations go, the first sprite table is at the address specified by the Name Base bits of $2101, and the offset of the second is determined by the Name bits of $2101. The word address in VRAM of a sprite's first tile may be calculated as:
+
+((Base<<13) + (cccccccc<<4) + (N ? ((Name+1)<<12) : 0)) & 0x7fff
+
+so 2101 - OBJSEL
+I guess it was zero and that's why we just loaded VRAM to 0
+
+so if my sprite tiles aren't at 0000, I need to establish a place and use that when loading OAM. Maybe I should move that first?
