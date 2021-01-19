@@ -107,7 +107,11 @@ Level1Palette:      .incbin "level1.pal"
 
     ; load sprites into VRAM
     tsx             ; save current stack pointer
-    pea $2000       ; push VRAM destination address to stack (is this a memory map offset thing later?)
+    pea $0800       ; push VRAM destination address to stack
+                    ; (is this a memory map offset thing later? NO, it's the VRAM offset)
+                    ; remember, VRAM is accessed through memory mapped registers and there
+                    ; are two bytes per location. so this $0800 means that data will be loaded
+                    ; starting at $1000
     pea SpriteData  ; push sprite source address to stack
     ; each tile is 0020. we have 4 tiles so that's 0080. really we're only using 2bpp
     pea $0080       ; push count of bytes (128 / $80) to transfer to stack
@@ -118,7 +122,7 @@ Level1Palette:      .incbin "level1.pal"
     ; Since these are right after the sprites, could just icnrease the count above
     ; but I want to understand it
     tsx
-    pea $0040       ; push VRAM destination address - start where the old one left off
+    pea $0000       ; push VRAM destination address - start where the old one left off
     pea WallData    ; wall tiles source address
     pea $0040       ; count of bytes (64) to transfer. just 2 tiles for now
     jsr LoadVRAM    ; transfer data in subroutine
@@ -133,6 +137,7 @@ Level1Palette:      .incbin "level1.pal"
     lda #(SCREEN_BOTTOM/2 - SPRITE_SIZE) ; sprite 1, vertical position
     sta OAMMIRROR, X
     inx
+    ; This below line needs to be updated for $1000
     lda #$00            ; sprite 1, name is 00
     sta OAMMIRROR, X
     inx

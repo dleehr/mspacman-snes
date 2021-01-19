@@ -306,7 +306,7 @@ Next steps
 0. Update palette python code to spit out separate BG and FG palettes DONE
 1. load BG Palette to 00 DONE
 2. load ms pacman palette to 80 DONE
-3. Load BG tiles to VRAM at $0000
-4. load ms pacman tiles to $1000
+3. Load BG tiles to VRAM at $0000 DONE
+4. load ms pacman tiles to $1000 DONE
 5. load BG character data to $0400 (aka tile map)
 6. Load ms pacman character data to $0800?
