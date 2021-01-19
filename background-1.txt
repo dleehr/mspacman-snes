@@ -292,7 +292,7 @@ This was for byte OBJ*4+2
 Character table in VRAM
 Sprites have two 16x16 tile character tables in VRAM. Wrapping on these works much like for BG tilemaps: tile 0 is to the right of tile $0F and below tile $F0, tile $10 is below tile 0 and to the right of tile $1F, tile $FF is to the left of tile $F0 and above tile $0F, and so on.
 
-As far as sprite table locations go, the first sprite table is at the address specified by the Name Base bits of $2101, and the offset of the second is determined by the Name bits of $2101. The word address in VRAM of a sprite's first tile may be calculated as:
+As far as sprite table locations go, the first sprite table is at the address specified by the Name Base bits of / $2101, and the offset of the second is determined by the Name bits of $2101. The word address in VRAM of a sprite's first tile may be calculated as:
 
 ((Base<<13) + (cccccccc<<4) + (N ? ((Name+1)<<12) : 0)) & 0x7fff
 
@@ -301,12 +301,62 @@ I guess it was zero and that's why we just loaded VRAM to 0
 
 so if my sprite tiles aren't at 0000, I need to establish a place and use that when loading OAM. Maybe I should move that first?
 
+sprite table - name base bits of $2101
+
+aaabbccc a = Size, b = Name Selection, c = Base Selection
+
+From https://media.smwcentral.net/Ersanio/SMWCstuff/Advanced%20documentation/qsnesdoc.html
+
+The character number indexes into an array of 8x8 tiles starting at a base VRAM location selected by bits 0-2 of register $2101. The byte address in VRAM where the character data starts can be found using the following calculation:
+    address_of_character = (base_location_bits << 14) + (32 * character_number);
+For example, if base location 1 is selected, and character number 1 is selected, the address will be 16384+32*1 = 16416.  Note that the word address entered into the VRAM address register will be half of that, or 8208.
+
+From https://nesdoug.com/2020/05/24/sprites/
+
+We need to change a few settings, first.
+$2101 sets the sprite size and the location of the sprite tiles.
+sssnnbbb
+sss = size mode*
+nn = offset for 2nd set of sprite tiles. leave it at zero, standard.
+bbb = base address for the sprite tiles.
+Again, the upper bit is useless. So, each b is a step of $2000.
+
+
+sss nn bbb
+000         - 8x8 sprites
+    00      - offset for second set of sprite tiles
+            - bbb = base address for the sprite tiles. Each B is a set of 2000
+
+000     0000
+001     2000
+010     4000
+011     6000
+
+
+
+
+so if my sprite tiles are at 2000, then I'd load #$01?
+that ends up with the address at 4000 - maybe this was written for my RAM or ROM offsets that get doubled
+
+But in practice:
+$06 0000 0110 -> 8000 / a000
+$05 0000 0101 -> 4000 / 6000
+$04 0000 0100 -> 0000 / 2000
+$03 0000 0011 -> c000 / e000
+$02 0000 0010 -> 8000 / a000
+$01 0000 0001 -> 4000 / 6000
+
+lda #$01
+sta OBJSEL
+
 Next steps
 
 0. Update palette python code to spit out separate BG and FG palettes DONE
 1. load BG Palette to 00 DONE
 2. load ms pacman palette to 80 DONE
 3. Load BG tiles to VRAM at $0000 DONE
-4. load ms pacman tiles to $1000 DONE
+4. load ms pacman tiles to $4000 DONE
+5. Update OAM table location of sprites DONE (#$01 -> OBJSEL)
+6. fix ordering (ms pacman is behind the background)
 5. load BG character data to $0400 (aka tile map)
-6. Load ms pacman character data to $0800?
+6. Load ms pacman character data to $0800? (this is OAMMIRROR and it's fine)

@@ -107,11 +107,12 @@ Level1Palette:      .incbin "level1.pal"
 
     ; load sprites into VRAM
     tsx             ; save current stack pointer
-    pea $0800       ; push VRAM destination address to stack
+    pea $2000       ; push VRAM destination address to stack
                     ; (is this a memory map offset thing later? NO, it's the VRAM offset)
                     ; remember, VRAM is accessed through memory mapped registers and there
-                    ; are two bytes per location. so this $0800 means that data will be loaded
-                    ; starting at $1000
+                    ; are two bytes per location. so this $2000 means that data will be loaded
+                    ; starting at $4000. Character sprites start at 0000 / 40000 / 8000 / c000
+                    ; so this works
     pea SpriteData  ; push sprite source address to stack
     ; each tile is 0020. we have 4 tiles so that's 0080. really we're only using 2bpp
     pea $0080       ; push count of bytes (128 / $80) to transfer to stack
@@ -127,6 +128,10 @@ Level1Palette:      .incbin "level1.pal"
     pea $0040       ; count of bytes (64) to transfer. just 2 tiles for now
     jsr LoadVRAM    ; transfer data in subroutine
     txs             ; "delete" data on stack by restoring old stack pointer
+
+;    lda #%00000001  ; set up OAM for sprite size andlocation of tiles - they start at $2000
+    lda #$01
+    sta OBJSEL
 
     ; set up initial data in OAMRAM mirror, using X as index
     ldx #$00
