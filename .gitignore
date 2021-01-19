@@ -1,3 +1,4 @@
 *.o
 *.smc
 *.sym
+__pycache__
