@@ -129,6 +129,11 @@ Level1Palette:      .incbin "level1.pal"
     jsr LoadVRAM    ; transfer data in subroutine
     txs             ; "delete" data on stack by restoring old stack pointer
 
+    ; load background
+    tsx
+    jsr LoadBG
+    txs
+
 ;    lda #%00000001  ; set up OAM for sprite size andlocation of tiles - they start at $2000
     lda #$01
     sta OBJSEL
@@ -391,7 +396,6 @@ UpdateOtherSprites:
 ; params: NumBytes: .byte, SrcPointer: .addr, DestPointer: .addr
 ; ---
 .proc   LoadVRAM
-        .byte $42, $00  ; breakdance
         phx         ; save old stack pointer that was transferred to x
         ; create frame pointer
         phd         ; push direct register to stack
@@ -498,31 +502,58 @@ CGRAMLoop:
 ;---
 
 .proc LoadBG
+    .byte $42, $00  ; breakdance
     phx ; save x
     phd ; create frame pointer
     tsc
     tcd
 SetupBGLocations:
     stz BGMODE   ; Mode 0, 8x8 tiles
-    lda #$04     ; tile map starting location in vram ...
-    sta BG1TMADD ; ...00000100 becomes $0400 in VRAM
-    lda #$01     ; character map starting location in vram...
-    sta BG12CADD ; ...lower 4 bits are for BG1, becomes $1000 in VRAM
+    lda #$04     ; map starting location in vram ...
+    sta BG1TMADD ; becomes $0800 in VRAM
+    lda #$00     ; tiles starting location in vram...
+    sta BG12CADD ; ...lower 4 bits are for BG1, becomes $0000 in VRAM
 LoadTileData:
     ; this happens in LoadVRAM
 LoadChrData:
-    ldx #$0000        ; we write to both VMADDL and VMADDH with a 16-bit register
+    ldx #$0400        ; we write to both VMADDL and VMADDH with a 16-bit register
     stx VMADDL
     lda #$80          ;
     sta VMAINC        ; increment VRAM address by 1 when writing to VMDATAH
-    ldx #$40          ; no flips, palette 1, top left elbow
-    stx VMDATAH
-    ldx #$41          ; no flips, palette 1, top wall
-    stx VMDATAH
-    ldx #$41          ; no flips, palette 1, top wall
-    stx VMDATAH
-    ldx #$44          ; h flip, palette 1, top left elbow
-    stx VMDATAH
+    ldx #$0000
+    ; Set a tile
+    ; high vhopppcc
+    ; low cccccccc
+    lda #$00        ; c = 0, elbow piece
+    sta VMDATAL
+    inx
+    lda #$00        ; vhopppcc = 0, palette 0, no flips
+    sta VMDATAH
+    inx
+    ; now a straight piece
+    lda #$01        ; c = 1, top wall
+    sta VMDATAL
+    inx
+    lda #$00        ;  vhopppcc = 0, palette 0, no flips
+    sta VMDATAH
+    inx
+    ; now a flipped elbow
+    lda #$00        ; c = 0, elbow
+    sta VMDATAL
+    inx
+    lda #%01000000  ; vhopppcc = v flip
+    sta VMDATAH
+    inx
+    ; loop until end of frame
+FinishChrBG:
+    inx
+    lda #$0f    ; want to keep high bits low but set name to 15
+    sta VMDATAL
+    inx
+    stz VMDATAH
+    cpx #$0800
+    bne FinishChrBG
+
 DoneBG:
     pld; restore frame pointer
     plx; restore x
