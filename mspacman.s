@@ -508,7 +508,8 @@ CGRAMLoop:
     tsc
     tcd
 SetupBGLocations:
-    stz BGMODE   ; Mode 0, 8x8 tiles
+    lda #$01
+    sta BGMODE   ; Mode 1 (for 16 colors per tile), 8x8 tiles
     lda #$04     ; map starting location in vram ...
     sta BG1TMADD ; becomes $0800 in VRAM
     lda #$00     ; tiles starting location in vram...
