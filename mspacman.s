@@ -146,7 +146,7 @@ Level1Palette:      .incbin "level1.pal"
     lda #$00            ; sprite 1, name is 00
     sta OAMMIRROR, X
     inx
-    lda #$00            ; no filp, palette 0
+    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
     sta OAMMIRROR, X
     inx
     ; upper-right sprite
@@ -159,7 +159,7 @@ Level1Palette:      .incbin "level1.pal"
     lda #$01            ; sprite 2, name is 01
     sta OAMMIRROR, X
     inx
-    lda #$00            ; no flip, palette 0
+    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
     sta OAMMIRROR, X
     inx
     ; lower-left sprite
@@ -172,7 +172,7 @@ Level1Palette:      .incbin "level1.pal"
     lda #$02            ; sprite 3, name is 02
     sta OAMMIRROR, X
     inx
-    lda #$00            ; no flip, palette 0
+    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
     sta OAMMIRROR, X
     inx
     ; lower-right sprite
@@ -185,7 +185,7 @@ Level1Palette:      .incbin "level1.pal"
     lda #$03            ; sprite 4, name is 03
     sta OAMMIRROR, X
     inx
-    lda #$00            ; no flip, palette 0
+    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
     sta OAMMIRROR, X
     inx
     ; move other sprites off screen in a loop
