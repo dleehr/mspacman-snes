@@ -20,6 +20,7 @@ VMDATAH     = $2119     ; high
 CGADD       = $2121     ; address for CGRAM read/write
 CGDATA      = $2122     ; Data for CGRAM write
 TM          = $212c     ; main screen designation
+SETINI      = $2133
 NMITIMEN    = $4200     ; enable flag for v-blank
 IOPORTW     = $4201     ; IO Port Write Register for joy
 MDMAEN      = $420b     ; DMA Enable Register
@@ -211,6 +212,9 @@ OAMLoop:
     sta HOR_SPEED
     sta VER_SPEED
 
+    ; enable overscan
+    lda #%00000100  ;   se--poIi
+    sta SETINI
 
     ; make objects visible - and BG1!
     lda #$11
