@@ -154,7 +154,8 @@ Level1Palette:      .incbin "level1.pal"
     sta OAMMIRROR, X
     inx
     ; move other sprites off screen in a loop
-    lda #$ff            ; this is 255, we will use it for both horizontal and vertical position
+    lda #$80
+;    lda #$ff            ; this is 255, we will use it for both horizontal and vertical position
 OAMLoop:
     sta OAMMIRROR, X
     inx

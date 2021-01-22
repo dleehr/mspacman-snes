@@ -368,3 +368,8 @@ height is 16, putting it at 223
 
 This tutorial was using 32x32 sprite and it didn't get clipped.
 maybe it's the 8x8? should I try 16x16.
+
+ah, it was because all my other sprites were at y=255, so they were all on the same line.
+need to turn these off!
+
+when moving it, the bar moved to the middle
