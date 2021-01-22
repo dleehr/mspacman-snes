@@ -268,85 +268,30 @@ CheckLeft:
     ; Left pressed
     lda #$ff        ; -1, go left
     sta HOR_SPEED
-    jmp LeftBoundaryCheck
+    jmp UpdatePosition
 CheckRight:
     lda JOY1AW
     and #$01        ; Check right
     beq HorzStill   ; right not pressed, make horizontally still
     lda #$01        ; +1, go right
     sta HOR_SPEED
-    jmp LeftBoundaryCheck
+    jmp UpdatePosition
 HorzStill:
     stz HOR_SPEED
+UpdatePosition:
     ; game logic: move the sprites
     ; move sprite 1 horizontally
     ; check collision left boundary
-LeftBoundaryCheck:
-    lda HOR_SPEED
-    bpl RightBoundaryCheck  ; if speed is positive, sprites are moving right so don't check left boundary check
     lda OAMMIRROR           ; load the horizontal position of the first sprite, which is the first byte at OAMMIRROR
     clc                     ; clear carry flag because we'll be adding and want to make sure it's not set
     adc HOR_SPEED           ; Add speed to the x position to get new x position
-    bcs UpdateHorPosition   ; if carry is set, we're still in range?
-    ; if clear, we moved below zero, reset x position
-    stz OAMMIRROR       ; store zero to h position
-    bra InvertHorSpeed  ; flip the horizontal speed vector
-    ; check right boundary
-RightBoundaryCheck:
-    lda OAMMIRROR
-    clc
-    adc HOR_SPEED
-    cmp #(SCREEN_RIGHT - 2 * SPRITE_SIZE) ; Check if x position is below edge minus 2 sprite widths
-    bcc UpdateHorPosition   ; if carry is clear, we're still in range
-    ; if set, we moved past the edge of the screen, back off x
-    lda #(SCREEN_RIGHT - 2 * SPRITE_SIZE)
-    sta OAMMIRROR       ; store x position of sprite
-    bra InvertHorSpeed  ; flip horizontal speed vector
-UpdateHorPosition:
     sta OAMMIRROR       ; store new x position of sprite
-    bra VerticalCheck   ; Now check vertical collisions
-; invert horizontal speed after horizontal bounce
-InvertHorSpeed:
-    lda HOR_SPEED       ; load current speed
-    eor #$ff            ; negate - first by xoring all bits
-    clc                 ; then add 1, must clear carry first
-    adc #$01
-    sta HOR_SPEED       ; store inverted speed
-
 ; move sprite 1 vertically
-VerticalCheck:
     ; check upper collision boundary
-    lda VER_SPEED
-    bpl CheckLowerBoundary  ; if sprites are moving down, skip upper check
     lda OAMMIRROR + $01     ; load current y position of first sprite
     clc
     adc VER_SPEED
-    bcs UpdateVerPosition ; if carry is set we're still in range
-    ; else, reposition sprite 1 vertical position to zero
-    stz OAMMIRROR + $01   ; store new y position
-    bra InvertVerSpeed    ; bounce off top of screen
-; check lower boundary
-CheckLowerBoundary:
-    lda OAMMIRROR + $01   ; load current y position of current sprite
-    clc
-    adc VER_SPEED
-    cmp #(SCREEN_BOTTOM - 2 * SPRITE_SIZE) ; compare to bottom edge
-    bcc UpdateVerPosition ; if carry clear, we're still in range
-    ; else, reposition sprite 1 vertical position to edge
-    lda #(SCREEN_BOTTOM - 2 * SPRITE_SIZE) ; bottom edge
-    sta OAMMIRROR + $01   ; store y position
-    bra InvertVerSpeed    ; bounce off bottom of screen
-UpdateVerPosition:
     sta OAMMIRROR + $01     ; store new y position of sprite
-    bra UpdateOtherSprites  ; update rest of sprites based on first one
-; invert vertical speed after vertical bounce
-InvertVerSpeed:
-    lda VER_SPEED           ; load current vertical speed
-    eor #$ff                ; flip all bits
-    clc
-    adc #$01
-    sta VER_SPEED           ; store inverted speed
-
 UpdateOtherSprites:
     lda OAMMIRROR           ; get x position of 1st sprite
     sta OAMMIRROR + $08     ; set x position of 3rd sprite, same as 1
