@@ -38,12 +38,12 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; --- Memory Map WRAM (just the layout of memory locations)
 HOR_SPEED   = $0300     ; The horizontal speed
 VER_SPEED   = $0301     ; the vertical speed
-OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM
+OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
 ; --- Joypad memory locations
-JOY1AW      = $0500     ;B, Select, Start, Up, Down, Left, Right
-JOY1BW      = $0501     ;A, X, L, R, iiii-ID
+JOY1AW      = $0700     ;B, Select, Start, Up, Down, Left, Right
+JOY1BW      = $0701     ;A, X, L, R, iiii-ID
 
 ; --- Game Constants
 ; Use these to check for collisions with screen boundaries
@@ -150,14 +150,19 @@ Level1Palette:      .incbin "level1.pal"
     lda #$00            ; sprite 1, name is 00
     sta OAMMIRROR, X
     inx
-    lda #$20            ; vhoopppN 00100001 = no h flip, no v flip, priority 2, palette 0, N=0
+    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
     sta OAMMIRROR, X
     inx
     ; move other sprites off screen in a loop
-    lda #$80
-;    lda #$ff            ; this is 255, we will use it for both horizontal and vertical position
 OAMLoop:
+    stz OAMMIRROR, X    ; x position (0)
+    inx
+    lda #$e0            ; y position (224)
     sta OAMMIRROR, X
+    inx
+    stz OAMMIRROR, X    ; name 00
+    inx
+    stz OAMMIRROR, X    ; vhoopppN 00000000 = no h flip, no v flip, priority 2, palette 0, N=0
     inx
     cpx #OAMMIRROR_SIZE
     bne OAMLoop         ; set every remaining coordinate (and other attributes) to 255
@@ -171,7 +176,6 @@ OAMLoop:
     lda #SPRITE_SPEED
     sta HOR_SPEED
     sta VER_SPEED
-
 
     ; make objects visible - and BG1!
     lda #$11
