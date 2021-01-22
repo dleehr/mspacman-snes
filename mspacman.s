@@ -54,7 +54,7 @@ SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
-SPRITE_SIZE     = $08   ; sprites are 8 by 8 pixels
+SPRITE_SIZE     = $10   ; sprites are 16x16
 OAMMIRROR_SIZE  = $0220 ; OAMRAM can hold 128 spites, 4 bytes each (oh right, this is just the object attributes - x, y, name, flip/prio/palette)
 ; ---
 
@@ -114,8 +114,7 @@ Level1Palette:      .incbin "level1.pal"
                     ; starting at $4000. Character sprites start at 0000 / 40000 / 8000 / c000
                     ; so this works
     pea SpriteData  ; push sprite source address to stack
-    ; each tile is 0020. we have 4 tiles so that's 0080. really we're only using 2bpp
-    pea $0080       ; push count of bytes (128 / $80) to transfer to stack
+    pea $0400       ; push count of bytes (1024 / $400) to transfer to stack
     jsr LoadVRAM    ; transfer vram data in subroutine
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -136,7 +135,7 @@ Level1Palette:      .incbin "level1.pal"
 
 ;    lda #%00000001  ; set up OAM for sprite size andlocation of tiles - they start at $2000
     lda #$01
-    sta OBJSEL
+    sta OBJSEL       ; $2101 Object size $ object data area designation
 
     ; set up initial data in OAMRAM mirror, using X as index
     ldx #$00
@@ -151,46 +150,7 @@ Level1Palette:      .incbin "level1.pal"
     lda #$00            ; sprite 1, name is 00
     sta OAMMIRROR, X
     inx
-    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
-    sta OAMMIRROR, X
-    inx
-    ; upper-right sprite
-    lda #(SCREEN_RIGHT/2)  ;    sprite 2, horizontal position - to the immediate right of sprite 1
-    sta OAMMIRROR, X
-    inx
-    lda #(SCREEN_BOTTOM/2 - SPRITE_SIZE)    ; sprite 2, vertical position
-    sta OAMMIRROR, X
-    inx
-    lda #$01            ; sprite 2, name is 01
-    sta OAMMIRROR, X
-    inx
-    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
-    sta OAMMIRROR, X
-    inx
-    ; lower-left sprite
-    lda #(SCREEN_RIGHT/2 - SPRITE_SIZE) ;   sprite 3, horizontal position, now the lower left
-    sta OAMMIRROR, X
-    inx
-    lda #(SCREEN_BOTTOM/2)      ; sprite 3, vertical position
-    sta OAMMIRROR, X
-    inx
-    lda #$02            ; sprite 3, name is 02
-    sta OAMMIRROR, X
-    inx
-    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
-    sta OAMMIRROR, X
-    inx
-    ; lower-right sprite
-    lda #(SCREEN_RIGHT/2)       ; sprite 4, horizontal position
-    sta OAMMIRROR, X
-    inx
-    lda #(SCREEN_BOTTOM/2)      ; sprite 4, vertical position
-    sta OAMMIRROR, X
-    inx
-    lda #$03            ; sprite 4, name is 03
-    sta OAMMIRROR, X
-    inx
-    lda #$20            ; vhoopppN 00100000 = no h flip, no v flip, priority 2, palette 0, N=0
+    lda #$20            ; vhoopppN 00100001 = no h flip, no v flip, priority 2, palette 0, N=0
     sta OAMMIRROR, X
     inx
     ; move other sprites off screen in a loop
@@ -203,7 +163,7 @@ OAMLoop:
 
     ; correct extra OAM byte for first four sprites (what?)
     ldx #$0200
-    lda #$00
+    lda #%0000010  ; this sets sprites to larger size - 16x16
     sta OAMMIRROR, X
 
     ; set initial horizontal and vertical speed
@@ -292,21 +252,6 @@ UpdatePosition:
     clc
     adc VER_SPEED
     sta OAMMIRROR + $01     ; store new y position of sprite
-UpdateOtherSprites:
-    lda OAMMIRROR           ; get x position of 1st sprite
-    sta OAMMIRROR + $08     ; set x position of 3rd sprite, same as 1
-    clc
-    adc #SPRITE_SIZE        ; x position of 2 and 4 will be offset by witdh of a sprite
-    sta OAMMIRROR + $04     ; set x position of sprite 2
-    sta OAMMIRROR + $0c     ; set x position of sprite 4
-    ; vertical positions
-    lda OAMMIRROR + $01     ; get y position of 1st sprite
-    sta OAMMIRROR + $05     ; set y position of 2nd sprite
-    clc
-    adc #SPRITE_SIZE        ; y position of 3 and 4 will be offset by height of sprite
-    sta OAMMIRROR + $09     ; set y position of 3rd sprite
-    sta OAMMIRROR + $0d     ; set y position of 4th sprite
-
     jmp GameLoop
 .endproc
 ; ---

@@ -357,6 +357,14 @@ Next steps
 3. Load BG tiles to VRAM at $0000 DONE
 4. load ms pacman tiles to $4000 DONE
 5. Update OAM table location of sprites DONE (#$01 -> OBJSEL)
-6. fix ordering (ms pacman is behind the background)
-5. load BG character data to $0400 (aka tile map)
-6. Load ms pacman character data to $0800? (this is OAMMIRROR and it's fine)
+6. fix ordering (ms pacman is behind the background) DONE
+    - https://megacatstudios.com/blogs/retro-development/super-nintendo-graphic-guide
+    - sprites need priority 2 or 3
+7. load BG character data to $0400 (aka tile map)
+8. Load ms pacman character data to $0800? (this is OAMMIRROR and it's fine)
+
+bottom most position is cf, which is 207
+height is 16, putting it at 223
+
+This tutorial was using 32x32 sprite and it didn't get clipped.
+maybe it's the 8x8? should I try 16x16.
