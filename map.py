@@ -4,19 +4,7 @@ from bitplanes import load
 import re
 import sys
 
-pat = r'((\d)x)*(\d)([HV]*)'
-
-def printable_flips(flips):
-    x = []
-    if 'H' in flips:
-        x.append('H')
-    else:
-        x.append(' ')
-    if 'V' in flips:
-        x.append('V')
-    else:
-        x.append(' ')
-    return ''.join(x)
+pat = r'((\d+)x)*(\d+)([HV]*)'
 
 def handle_tile(tile):
     vals = re.search(pat, tile)
@@ -41,13 +29,12 @@ def handle_tile(tile):
 
     for x in range(repeat):
         word = high_byte << 8 | low_byte
-
-        print('  {0:08b}   {1:08b} ${2:04x} {3:03d} {4:2s} {5:02d}'.format(high_byte, low_byte, word, piece, printable_flips(flips), x))
+        print('{0:08b} {1:08b} ${2:04x} {3:03d} {4:1s}{5:1s} {6:02d}'.format(high_byte, low_byte, word, piece, 'H' if h_flip else '', 'V' if v_flip else '', x))
         # Check this ordering
         yield word.to_bytes(2, byteorder='little')
 
 def write(rows, filename):
-    print('H vhopppcc L cccccccc $WORD TIL HV RP')
+    print('vhopppcc cccccccc $WORD TIL HV RP')
     with open(filename, 'wb') as f:
         for row in rows:
             for tile in row.split():
