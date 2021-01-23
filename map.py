@@ -6,6 +6,18 @@ import sys
 
 pat = r'((\d)x)*(\d)([HV]*)'
 
+def printable_flips(flips):
+    x = []
+    if 'H' in flips:
+        x.append('H')
+    else:
+        x.append(' ')
+    if 'V' in flips:
+        x.append('V')
+    else:
+        x.append(' ')
+    return ''.join(x)
+
 def handle_tile(tile):
     vals = re.search(pat, tile)
     # Group 2 is the count
@@ -26,14 +38,16 @@ def handle_tile(tile):
         raise Exception('Piece index too large: {}'.format(piece))
     low_byte = piece
     high_byte = piece >> 8 | v_flip << 7 | h_flip << 6
+
     for x in range(repeat):
         word = high_byte << 8 | low_byte
-        print('  {0:08b}   {1:08b} ${2:04x} {3:03d} {4:2s} {5:02d}'.format(high_byte, low_byte, word, piece, flips, x))
+
+        print('  {0:08b}   {1:08b} ${2:04x} {3:03d} {4:2s} {5:02d}'.format(high_byte, low_byte, word, piece, printable_flips(flips), x))
         # Check this ordering
         yield word.to_bytes(2, byteorder='little')
 
 def write(rows, filename):
-    print('H vhopppcc L cccccccc $WORD TIL HV RR')
+    print('H vhopppcc L cccccccc $WORD TIL HV RP')
     with open(filename, 'wb') as f:
         for row in rows:
             for tile in row.split():
