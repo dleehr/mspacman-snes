@@ -390,3 +390,6 @@ Shorthand for background tile map
 
 top row of level 1
 1x1, 6x2, 3, 3H, 10x2, 3, 3H, 6x2, 1H
+
+moving tile map since this gets into vram. lots of vram to use here
+6000 -> 30
