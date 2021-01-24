@@ -125,7 +125,7 @@ Level1Map:          .incbin "level1.tlm"
     tsx
     pea $0000       ; push VRAM destination address - start where the old one left off
     pea WallData    ; wall tiles source address
-    pea $0040       ; count of bytes (64) to transfer. just 2 tiles for now
+    pea $0060       ; count of bytes (64) to transfer. just 2 tiles for now
     jsr LoadVRAM    ; transfer data in subroutine
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -421,36 +421,15 @@ LoadChrData:
     ; Set a tile
     ; high vhopppcc
     ; low cccccccc
-    lda #$00        ; c = 0, elbow piece
-    sta VMDATAL
-    inx
-    lda #$00        ; vhopppcc = 0, palette 0, no flips
-    sta VMDATAH
-    inx
-    ; now a straight piece
-    lda #$01        ; c = 1, top wall
-    sta VMDATAL
-    inx
-    lda #$00        ;  vhopppcc = 0, palette 0, no flips
-    sta VMDATAH
-    inx
-    ; now a flipped elbow
-    lda #$00        ; c = 0, elbow
-    sta VMDATAL
-    inx
-    lda #%01000000  ; vhopppcc = v flip
-    sta VMDATAH
-    inx
-    ; loop until end of frame
 FinishChrBG:
-    inx
-    lda #$0f    ; want to keep high bits low but set name to 15
+    lda Level1Map, X
     sta VMDATAL
     inx
-    stz VMDATAH
+    lda Level1Map, X
+    sta VMDATAH
+    inx
     cpx #$0800
     bne FinishChrBG
-
 DoneBG:
     pld; restore frame pointer
     plx; restore x
