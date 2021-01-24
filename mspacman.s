@@ -125,7 +125,7 @@ Level1Map:          .incbin "level1.tlm"
     tsx
     pea $0000       ; push VRAM destination address - start where the old one left off
     pea WallData    ; wall tiles source address
-    pea $0060       ; count of bytes (64) to transfer. just 2 tiles for now
+    pea $0140       ; count of bytes (320) to transfer
     jsr LoadVRAM    ; transfer data in subroutine
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -407,6 +407,7 @@ SetupBGLocations:
     lda #$01
     sta BGMODE   ; Mode 1 (for 16 colors per tile), 8x8 tiles
     lda #$04     ; map starting location in vram ...
+    ; make BGTM1ADD 6000
     sta BG1TMADD ; becomes $0800 in VRAM
     lda #$00     ; tiles starting location in vram...
     sta BG12CADD ; ...lower 4 bits are for BG1, becomes $0000 in VRAM
