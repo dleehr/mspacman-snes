@@ -68,6 +68,7 @@ SpriteData: .incbin "Sprites.vra"
 WallData:   .incbin "Walls.vra"
 MsPacmanPalette:    .incbin "mspacman.pal"
 Level1Palette:      .incbin "level1.pal"
+Level1Map:          .incbin "level1.tlm"
 ; ---
 
 .segment "CODE"
