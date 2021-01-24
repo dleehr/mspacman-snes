@@ -406,15 +406,14 @@ CGRAMLoop:
 SetupBGLocations:
     lda #$01
     sta BGMODE   ; Mode 1 (for 16 colors per tile), 8x8 tiles
-    lda #$04     ; map starting location in vram ...
-    ; make BGTM1ADD 6000
-    sta BG1TMADD ; becomes $0800 in VRAM
+    lda #$30     ; map starting location in vram ...
+    sta BG1TMADD ; becomes $6000 in VRAM
     lda #$00     ; tiles starting location in vram...
     sta BG12CADD ; ...lower 4 bits are for BG1, becomes $0000 in VRAM
 LoadTileData:
     ; this happens in LoadVRAM
 LoadChrData:
-    ldx #$0400        ; we write to both VMADDL and VMADDH with a 16-bit register
+    ldx #$3000        ; we write to both VMADDL and VMADDH with a 16-bit register
     stx VMADDL
     lda #$80          ;
     sta VMAINC        ; increment VRAM address by 1 when writing to VMDATAH
