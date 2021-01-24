@@ -125,7 +125,7 @@ Level1Map:          .incbin "level1.tlm"
     tsx
     pea $0000       ; push VRAM destination address - start where the old one left off
     pea WallData    ; wall tiles source address
-    pea $0140       ; count of bytes (320) to transfer
+    pea $0160       ; count of bytes (352) to transfer
     jsr LoadVRAM    ; transfer data in subroutine
     txs             ; "delete" data on stack by restoring old stack pointer
 
