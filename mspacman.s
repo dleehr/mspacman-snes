@@ -45,6 +45,13 @@ OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 JOY1AW      = $0700     ;B, Select, Start, Up, Down, Left, Right
 JOY1BW      = $0701     ;A, X, L, R, iiii-ID
 
+; ---- Joypad bits
+JOY_UP = $08
+JOY_DOWN = $04
+JOY_LEFT = $02
+JOY_RIGHT = $01
+
+
 ; --- Game Constants
 ; Use these to check for collisions with screen boundaries
 SCREEN_LEFT     = $00   ; left screen boundary = 0
@@ -210,41 +217,40 @@ Joypad:
     sta JOY1BW
     ; Check up/down direction
 CheckUp:
-    ; ;B, Select, Start, Up, Down, Left, Right
     lda JOY1AW
-    and #$08        ; Check the Up flag
+    and #JOY_UP
     beq CheckDown
     ; up was pressed....
     lda #$ff        ; -1 means dig up, stupid
     sta VER_SPEED
-    jmp CheckLeft
+    stz HOR_SPEED   ; only cardinal directions
+    jmp UpdatePosition
 CheckDown:
     lda JOY1AW
-    and #$04        ; Check Down
-    beq VertStill   ; Down not pressed either, clear speed
+    and #JOY_DOWN
+    beq CheckLeft    ; Down not pressed either,
     ; down pressed
     lda #$01        ; down pressed, dig down
     sta VER_SPEED
-    jmp CheckLeft
-VertStill:
-    stz VER_SPEED
+    stz HOR_SPEED   ; only cardinal directions
+    jmp UpdatePosition
 CheckLeft:
     lda JOY1AW
-    and #$02        ; Check left
+    and #JOY_LEFT        ; Check left
     beq CheckRight  ; Left no pressed, check the last one
     ; Left pressed
     lda #$ff        ; -1, go left
     sta HOR_SPEED
+    stz VER_SPEED   ; only cardinal directions
     jmp UpdatePosition
 CheckRight:
     lda JOY1AW
-    and #$01        ; Check right
-    beq HorzStill   ; right not pressed, make horizontally still
+    and #JOY_RIGHT        ; Check right
+    beq UpdatePosition   ; right not pressed, update position
     lda #$01        ; +1, go right
     sta HOR_SPEED
+    stz VER_SPEED   ; only cardinal directions
     jmp UpdatePosition
-HorzStill:
-    stz HOR_SPEED
 UpdatePosition:
     ; game logic: move the sprites
     ; move sprite 1 horizontally

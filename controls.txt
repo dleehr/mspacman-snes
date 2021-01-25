@@ -1,2 +1,29 @@
 initial position: 68, 83
 (104, 131)
+
+Store a x direction and a y direction - initially 0
+
+read gamepad. direction is in JOY1AW
+
+; ;B, Select, Start, Up, Down, Left, Right
+lda JOY1AW
+and #0f
+
+1000 up
+0100 down
+0010 left
+0001 right
+
+if it's not zero, then a direction was pressed.
+
+    and #$08        ; Check the Up flag
+
+
+- if left:
+    check wall on left (currently no-op)
+    set x direction to left
+    set y direction to 0
+
+
+
+movement
