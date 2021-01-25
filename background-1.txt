@@ -360,8 +360,8 @@ Next steps
 6. fix ordering (ms pacman is behind the background) DONE
     - https://megacatstudios.com/blogs/retro-development/super-nintendo-graphic-guide
     - sprites need priority 2 or 3
-7. load BG character data to $0400 (aka tile map)
-8. Load ms pacman character data to $0800? (this is OAMMIRROR and it's fine)
+7. load BG character data to $0400 (aka tile map) DONE
+8. Load ms pacman character data to $0800? (this is OAMMIRROR and it's fine) DONE
 
 bottom most position is cf, which is 207
 height is 16, putting it at 223
@@ -373,3 +373,25 @@ ah, it was because all my other sprites were at y=255, so they were all on the s
 need to turn these off!
 
 when moving it, the bar moved to the middle
+
+OK fixed that up
+
+What's next?
+
+1. Fill out rest of the background tiles
+2. Fill out the background tile map
+3. Figure out dots
+4. Figure out enemies
+2. Implement collision detection
+
+Shorthand for background tile map
+
+(count x )(tile number)(H/V flip)
+
+top row of level 1
+1x1, 6x2, 3, 3H, 10x2, 3, 3H, 6x2, 1H
+
+moving tile map since this gets into vram. lots of vram to use here
+6000 -> 30
+
+Missing some tiles for the monster cage

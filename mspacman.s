@@ -68,6 +68,7 @@ SpriteData: .incbin "Sprites.vra"
 WallData:   .incbin "Walls.vra"
 MsPacmanPalette:    .incbin "mspacman.pal"
 Level1Palette:      .incbin "level1.pal"
+Level1Map:          .incbin "level1.tlm"
 ; ---
 
 .segment "CODE"
@@ -124,7 +125,7 @@ Level1Palette:      .incbin "level1.pal"
     tsx
     pea $0000       ; push VRAM destination address - start where the old one left off
     pea WallData    ; wall tiles source address
-    pea $0040       ; count of bytes (64) to transfer. just 2 tiles for now
+    pea $0160       ; count of bytes (352) to transfer
     jsr LoadVRAM    ; transfer data in subroutine
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -405,14 +406,14 @@ CGRAMLoop:
 SetupBGLocations:
     lda #$01
     sta BGMODE   ; Mode 1 (for 16 colors per tile), 8x8 tiles
-    lda #$04     ; map starting location in vram ...
-    sta BG1TMADD ; becomes $0800 in VRAM
+    lda #$30     ; map starting location in vram ...
+    sta BG1TMADD ; becomes $6000 in VRAM
     lda #$00     ; tiles starting location in vram...
     sta BG12CADD ; ...lower 4 bits are for BG1, becomes $0000 in VRAM
 LoadTileData:
     ; this happens in LoadVRAM
 LoadChrData:
-    ldx #$0400        ; we write to both VMADDL and VMADDH with a 16-bit register
+    ldx #$3000        ; we write to both VMADDL and VMADDH with a 16-bit register
     stx VMADDL
     lda #$80          ;
     sta VMAINC        ; increment VRAM address by 1 when writing to VMDATAH
@@ -420,36 +421,15 @@ LoadChrData:
     ; Set a tile
     ; high vhopppcc
     ; low cccccccc
-    lda #$00        ; c = 0, elbow piece
-    sta VMDATAL
-    inx
-    lda #$00        ; vhopppcc = 0, palette 0, no flips
-    sta VMDATAH
-    inx
-    ; now a straight piece
-    lda #$01        ; c = 1, top wall
-    sta VMDATAL
-    inx
-    lda #$00        ;  vhopppcc = 0, palette 0, no flips
-    sta VMDATAH
-    inx
-    ; now a flipped elbow
-    lda #$00        ; c = 0, elbow
-    sta VMDATAL
-    inx
-    lda #%01000000  ; vhopppcc = v flip
-    sta VMDATAH
-    inx
-    ; loop until end of frame
 FinishChrBG:
-    inx
-    lda #$0f    ; want to keep high bits low but set name to 15
+    lda Level1Map, X
     sta VMDATAL
     inx
-    stz VMDATAH
+    lda Level1Map, X
+    sta VMDATAH
+    inx
     cpx #$0800
     bne FinishChrBG
-
 DoneBG:
     pld; restore frame pointer
     plx; restore x
