@@ -1,0 +1,2 @@
+initial position: 68, 83
+(104, 131)

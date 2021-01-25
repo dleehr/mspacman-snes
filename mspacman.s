@@ -51,6 +51,8 @@ SCREEN_LEFT     = $00   ; left screen boundary = 0
 SCREEN_RIGHT    = $ff   ; right screen boundary = 255
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
+STARTING_X      = $68
+STARTING_Y      = $83
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
@@ -141,13 +143,12 @@ Level1Map:          .incbin "level1.tlm"
     ; set up initial data in OAMRAM mirror, using X as index
     ldx #$00
     ; upper-left sprite, starts at halfway point
-    lda #(SCREEN_RIGHT/2 - SPRITE_SIZE); sprite 1, horizontal position to put at center of screen
+    lda #STARTING_X     ; starting X position for player
     sta OAMMIRROR, X    ; store A into OAMMIRROR memory location, offset by X (like c pointer arithmetic offset)
     inx                 ; increment index
-    lda #(SCREEN_BOTTOM/2 - SPRITE_SIZE) ; sprite 1, vertical position
+    lda #STARTING_Y     ; starting Y position for player
     sta OAMMIRROR, X
     inx
-    ; This below line needs to be updated for $1000
     lda #$00            ; sprite 1, name is 00
     sta OAMMIRROR, X
     inx
