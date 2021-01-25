@@ -393,3 +393,5 @@ top row of level 1
 
 moving tile map since this gets into vram. lots of vram to use here
 6000 -> 30
+
+Missing some tiles for the monster cage
