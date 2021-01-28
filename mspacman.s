@@ -58,8 +58,8 @@ SCREEN_LEFT     = $00   ; left screen boundary = 0
 SCREEN_RIGHT    = $df   ; right screen boundary = 25
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
-STARTING_X      = $68
-STARTING_Y      = $83
+STARTING_X      = $00
+STARTING_Y      = $88
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
@@ -269,38 +269,38 @@ CheckExistingVerticalMovement:
     ; if 1 check bottom wall
     bpl CheckBottomWall
 CheckLeftWall:
-    lda OAMMIRROR
-    clc
-    adc HOR_SPEED
-    ; new position in a
-    ; compare it to zero for now. later on check walls in map
-    bne UpdatePosition      ; not equal, we're good to go
-    ; computed x-coordinate was zero, reset HOR_SPEED and jump to update Position
-    stz HOR_SPEED
-    jmp UpdatePosition
 CheckRightWall:
-    lda OAMMIRROR
-    clc
-    adc HOR_SPEED
-    cmp #(SCREEN_RIGHT - SPRITE_SIZE)   ; x-coordinate is on left edge
-    bcc UpdatePosition  ; if carry is clear, we haven't moved past the right edge
-    stz HOR_SPEED
-    jmp UpdatePosition
 CheckTopWall:
-    lda OAMMIRROR + $01
-    clc
-    adc VER_SPEED
-    bne UpdatePosition
-    stz VER_SPEED
-    jmp UpdatePosition
 CheckBottomWall:
-    lda OAMMIRROR + $01
+CheckAgainstBackground:
+    .byte $42, $00  ; breakdance
+    ; Need to do this differently for different edges
+    rep #$20            ; set A to 16-bit so that we can transfer it to X
+    lda OAMMIRROR + $01     ; load y position into A
+    and #$00ff
+    asl A
+    asl A
+    asl A
+;    and #$fe             ; make sure lowest bit isn't set
+    pha                  ; push A
+    lda OAMMIRROR        ; load x position into A
+    and #$00ff
+    lsr A                ; Divide
+    lsr A                ; ...
+    lsr A                ; by 8?
     clc
-    adc VER_SPEED
-    cmp #(SCREEN_BOTTOM - SPRITE_SIZE)  ; y coordinate is on top edge
-    bcc UpdatePosition
+    adc $01, S          ; add y index to x index
+    ; now A has the offset of the tile
+    ; transfer it to x
+    tax
+    pla                 ; clear up stack
+    sep #$20        ; set A back to 8-bit
+    lda Level1Map, X
+    ; A now has the background tile. 00 is empty
+    beq UpdatePosition   ; target tile is empty, go ahed with move
+    ; stop
+    stz HOR_SPEED
     stz VER_SPEED
-    ; jmp UpdatePosition    ; already there
 UpdatePosition:
     ; game logic: move the sprites
     lda OAMMIRROR           ; load the horizontal position of the first sprite, which is the first byte at OAMMIRROR
@@ -455,7 +455,6 @@ CGRAMLoop:
 ;---
 
 .proc LoadBG
-    .byte $42, $00  ; breakdance
     phx ; save x
     phd ; create frame pointer
     tsc

@@ -27,3 +27,43 @@ if it's not zero, then a direction was pressed.
 
 
 movement
+
+
+Checking if sprite would move into background
+
+divide y by 32 to get the row from the pixel
+then multiply the rows by 16 since there are 16 bytes per row.
+
+actually can just divide by 2 and clear the low bit
+
+divide x by 32 to get the column from the pixel
+add to above
+
+this is the offset into the map
+load that and see if it's zero
+if so, don't move!
+
+This is just for the top left corner. For moving down or right, need to check +1
+
+divide y by 16
+add to x / 32
+
+
+
+
+17 * 32 = 544 tiles offset
+
+I'm actually getting 131
+
+
+Initial Y coordinate is 0x83 or 131. what row is this? should be 16 or 17
+initial x coordinate is 68
+
+This target position should be more like 0x400
+
+I tweaked my shifting of y coordinate to get it into the ballpark but never really did the math
+
+Not working as I expected.
+Instead of stopping i should store some values to memory and peek at them.
+maybe add a stop button too?
+more for tomorrow
