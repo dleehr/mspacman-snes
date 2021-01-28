@@ -55,7 +55,7 @@ JOY_RIGHT = $01
 ; --- Game Constants
 ; Use these to check for collisions with screen boundaries
 SCREEN_LEFT     = $00   ; left screen boundary = 0
-SCREEN_RIGHT    = $ff   ; right screen boundary = 255
+SCREEN_RIGHT    = $df   ; right screen boundary = 25
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 STARTING_X      = $68
@@ -224,7 +224,7 @@ CheckUp:
     lda #$ff        ; -1 means dig up, stupid
     sta VER_SPEED
     stz HOR_SPEED   ; only cardinal directions
-    jmp UpdatePosition
+    jmp CheckTopWall
 CheckDown:
     lda JOY1AW
     and #JOY_DOWN
@@ -233,7 +233,7 @@ CheckDown:
     lda #$01        ; down pressed, dig down
     sta VER_SPEED
     stz HOR_SPEED   ; only cardinal directions
-    jmp UpdatePosition
+    jmp CheckBottomWall
 CheckLeft:
     lda JOY1AW
     and #JOY_LEFT        ; Check left
@@ -242,23 +242,73 @@ CheckLeft:
     lda #$ff        ; -1, go left
     sta HOR_SPEED
     stz VER_SPEED   ; only cardinal directions
-    jmp UpdatePosition
+    jmp CheckLeftWall
 CheckRight:
     lda JOY1AW
     and #JOY_RIGHT        ; Check right
-    beq UpdatePosition   ; right not pressed, update position
+    beq CheckExistingHorizontalMovement   ; nothing pressed, done checking buttons
     lda #$01        ; +1, go right
     sta HOR_SPEED
     stz VER_SPEED   ; only cardinal directions
+    jmp CheckRightWall
+; Nothing pressed, check existing movement
+CheckExistingHorizontalMovement:
+    lda HOR_SPEED
+    ; if zero do nothing
+    beq CheckExistingVerticalMovement
+    ; if -1, CheckLeftWall
+    bmi CheckLeftWall
+    ; if 1, CheckRightWall
+    bpl CheckRightWall
+CheckExistingVerticalMovement:
+    lda VER_SPEED
+    ; if zero do nothing
+    beq UpdatePosition
+    ; if -1 check top wall
+    bmi CheckTopWall
+    ; if 1 check bottom wall
+    bpl CheckBottomWall
+CheckLeftWall:
+    lda OAMMIRROR
+    clc
+    adc HOR_SPEED
+    ; new position in a
+    ; compare it to zero for now. later on check walls in map
+    bne UpdatePosition      ; not equal, we're good to go
+    ; computed x-coordinate was zero, reset HOR_SPEED and jump to update Position
+    stz HOR_SPEED
     jmp UpdatePosition
+CheckRightWall:
+    lda OAMMIRROR
+    clc
+    adc HOR_SPEED
+    cmp #(SCREEN_RIGHT - SPRITE_SIZE)   ; x-coordinate is on left edge
+    bcc UpdatePosition  ; if carry is clear, we haven't moved past the right edge
+    stz HOR_SPEED
+    jmp UpdatePosition
+CheckTopWall:
+    lda OAMMIRROR + $01
+    clc
+    adc VER_SPEED
+    bne UpdatePosition
+    stz VER_SPEED
+    jmp UpdatePosition
+CheckBottomWall:
+    lda OAMMIRROR + $01
+    clc
+    adc VER_SPEED
+    cmp #(SCREEN_BOTTOM - SPRITE_SIZE)  ; y coordinate is on top edge
+    bcc UpdatePosition
+    stz VER_SPEED
+    ; jmp UpdatePosition    ; already there
 UpdatePosition:
     ; game logic: move the sprites
-    ; move sprite 1 horizontally
-    ; check collision left boundary
     lda OAMMIRROR           ; load the horizontal position of the first sprite, which is the first byte at OAMMIRROR
     clc                     ; clear carry flag because we'll be adding and want to make sure it's not set
     adc HOR_SPEED           ; Add speed to the x position to get new x position
     sta OAMMIRROR       ; store new x position of sprite
+
+
 ; move sprite 1 vertically
     ; check upper collision boundary
     lda OAMMIRROR + $01     ; load current y position of first sprite
