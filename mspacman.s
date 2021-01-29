@@ -65,9 +65,9 @@ SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 STARTING_X      = $68
 STARTING_Y      = $83
 TOP_OFFSET      = $05
-BOTTOM_OFFSET   = $13
+BOTTOM_OFFSET   = $0C
 LEFT_OFFSET     = $04
-RIGHT_OFFSET    = $14
+RIGHT_OFFSET    = $0B
 
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
