@@ -38,6 +38,8 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; --- Memory Map WRAM (just the layout of memory locations)
 HOR_SPEED   = $0300     ; The horizontal speed
 VER_SPEED   = $0301     ; the vertical speed
+HOR_OFFSET  = $0302     ; the sprite-edge offset for x
+VER_OFFSET  = $0303     ; the sprite-edge offset for y
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -60,8 +62,13 @@ SCREEN_LEFT     = $00   ; left screen boundary = 0
 SCREEN_RIGHT    = $df   ; right screen boundary = 25
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
-STARTING_X      = $00
-STARTING_Y      = $88
+STARTING_X      = $68
+STARTING_Y      = $83
+TOP_OFFSET      = $05
+BOTTOM_OFFSET   = $13
+LEFT_OFFSET     = $04
+RIGHT_OFFSET    = $14
+
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
@@ -223,10 +230,13 @@ CheckUp:
     and #JOY_UP
     beq CheckDown
     ; up was pressed....
-    .byte $42, $00  ; breakdance
     lda #$ff        ; -1 means dig up, stupid
     sta VER_SPEED
+    lda #TOP_OFFSET
+    sta VER_OFFSET
     stz HOR_SPEED   ; only cardinal directions
+    lda #LEFT_OFFSET
+    sta HOR_OFFSET
     jmp CheckTopWall
 CheckDown:
     lda JOY1AW
@@ -235,7 +245,11 @@ CheckDown:
     ; down pressed
     lda #$01        ; down pressed, dig down
     sta VER_SPEED
+    lda #BOTTOM_OFFSET
+    sta VER_OFFSET
     stz HOR_SPEED   ; only cardinal directions
+    lda #LEFT_OFFSET
+    sta HOR_OFFSET
     jmp CheckBottomWall
 CheckLeft:
     lda JOY1AW
@@ -244,7 +258,11 @@ CheckLeft:
     ; Left pressed
     lda #$ff        ; -1, go left
     sta HOR_SPEED
+    lda #LEFT_OFFSET
+    sta HOR_OFFSET
     stz VER_SPEED   ; only cardinal directions
+    lda #TOP_OFFSET
+    sta VER_OFFSET
     jmp CheckLeftWall
 CheckRight:
     lda JOY1AW
@@ -252,7 +270,11 @@ CheckRight:
     beq CheckExistingHorizontalMovement   ; nothing pressed, done checking buttons
     lda #$01        ; +1, go right
     sta HOR_SPEED
+    lda #RIGHT_OFFSET
+    sta HOR_OFFSET
     stz VER_SPEED   ; only cardinal directions
+    lda #TOP_OFFSET
+    sta VER_OFFSET
     jmp CheckRightWall
 ; Nothing pressed, check existing movement
 CheckExistingHorizontalMovement:
@@ -276,13 +298,12 @@ CheckRightWall:
 CheckTopWall:
 CheckBottomWall:
 CheckAgainstBackground:
-    ; Need to do this differently for different edges
     rep #$20            ; set A to 16-bit so that we can transfer it to X
     lda OAMMIRROR + $01     ; load y position into A
     clc
     adc VER_SPEED           ; add the veritcal speed to get the new y coordinate
     clc
-    adc #$05                ; handle top offset
+    adc VER_OFFSET          ; handle top/bottom offset
     and #$00f8
     asl A
     asl A
@@ -294,7 +315,7 @@ CheckAgainstBackground:
     ; the x position of the sprite is 5 pixels to the left of the character
     ; so we should check for collisions 5 pixels to the left
     clc
-    adc #$04             ; handle left offset
+    adc HOR_OFFSET             ; handle left/right offset
     and #$00f8
     lsr A                ; Divide
     lsr A                ; by 4 - because we divide y 8 and then double
