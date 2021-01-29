@@ -45,6 +45,8 @@ OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 JOY1AW      = $0700     ;B, Select, Start, Up, Down, Left, Right
 JOY1BW      = $0701     ;A, X, L, R, iiii-ID
 
+BG_COLLISION    = $0710 ; will be writing the current background tile here
+
 ; ---- Joypad bits
 JOY_UP = $08
 JOY_DOWN = $04
@@ -273,30 +275,28 @@ CheckRightWall:
 CheckTopWall:
 CheckBottomWall:
 CheckAgainstBackground:
-    .byte $42, $00  ; breakdance
     ; Need to do this differently for different edges
     rep #$20            ; set A to 16-bit so that we can transfer it to X
     lda OAMMIRROR + $01     ; load y position into A
-    and #$00ff
+    and #$00f8
     asl A
     asl A
     asl A
-;    and #$fe             ; make sure lowest bit isn't set
     pha                  ; push A
     lda OAMMIRROR        ; load x position into A
-    and #$00ff
+    and #$00f8
     lsr A                ; Divide
-    lsr A                ; ...
-    lsr A                ; by 8?
+    lsr A                ; by 4 - because we divide y 8 and then double
     clc
     adc $01, S          ; add y index to x index
     ; now A has the offset of the tile
     ; transfer it to x
     tax
     pla                 ; clear up stack
-    sep #$20        ; set A back to 8-bit
     lda Level1Map, X
-    ; A now has the background tile. 00 is empty
+    sta BG_COLLISION    ; for debugging
+    sep #$20        ; set A back to 8-bit
+    ; A now has the lower byte of the background tile. 00 is empty. lower bits on upper byte could be set but we don't use that many
     beq UpdatePosition   ; target tile is empty, go ahed with move
     ; stop
     stz HOR_SPEED
