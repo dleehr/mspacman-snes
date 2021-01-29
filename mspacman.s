@@ -223,6 +223,7 @@ CheckUp:
     and #JOY_UP
     beq CheckDown
     ; up was pressed....
+    .byte $42, $00  ; breakdance
     lda #$ff        ; -1 means dig up, stupid
     sta VER_SPEED
     stz HOR_SPEED   ; only cardinal directions
@@ -278,12 +279,22 @@ CheckAgainstBackground:
     ; Need to do this differently for different edges
     rep #$20            ; set A to 16-bit so that we can transfer it to X
     lda OAMMIRROR + $01     ; load y position into A
+    clc
+    adc VER_SPEED           ; add the veritcal speed to get the new y coordinate
+    clc
+    adc #$05                ; handle top offset
     and #$00f8
     asl A
     asl A
     asl A
     pha                  ; push A
     lda OAMMIRROR        ; load x position into A
+    clc
+    adc HOR_SPEED        ; add the horizontal speed to get the new x coordinate
+    ; the x position of the sprite is 5 pixels to the left of the character
+    ; so we should check for collisions 5 pixels to the left
+    clc
+    adc #$04             ; handle left offset
     and #$00f8
     lsr A                ; Divide
     lsr A                ; by 4 - because we divide y 8 and then double
