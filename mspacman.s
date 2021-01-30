@@ -38,8 +38,7 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; --- Memory Map WRAM (just the layout of memory locations)
 TARGET_X    = $0300     ; New x position for sprite when computing movement
 TARGET_Y    = $0301     ; New Y position for sprite when computing movement
-HOR_OFFSET  = $0302     ; the sprite-edge offset for x
-VER_OFFSET  = $0303     ; the sprite-edge offset for y
+BG_COLLISION    = $0302 ; will be writing the current background tile here
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -47,7 +46,6 @@ OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 JOY1AW      = $0700     ;B, Select, Start, Up, Down, Left, Right
 JOY1BW      = $0701     ;A, X, L, R, iiii-ID
 
-BG_COLLISION    = $0710 ; will be writing the current background tile here
 
 ; ---- Joypad bits
 JOY_UP = $08

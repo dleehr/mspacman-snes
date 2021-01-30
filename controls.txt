@@ -112,3 +112,34 @@ else (no joystick movement):
 
 movement:
     move by player direction
+
+
+
+Ah, the collisions and borders are actually a lot easier.
+I was considering the black space in non-00 tiles to be places we could go, but it's not
+It's a fixed offset - like a trench running through the middle.
+consider an 8x8 block centered UNDER the character (4px buffer on each side)
+don't let that block move onto a tile unless the tile is 0
+
+ 0123456789ABCDEF
+0
+1
+2
+3
+4    XXXXXXXX
+5    XXXXXXXX
+6    XXXXXXXX
+7    XXXXXXXX
+8    XXXXXXXX
+9    XXXXXXXX
+A    XXXXXXXX
+B    XXXXXXXX
+C
+D
+E
+F
+
+So top-left is sprite position + 4, 4
+Bottom-right is sprite-position + C, C
+
+
