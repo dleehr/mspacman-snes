@@ -142,4 +142,23 @@ F
 So top-left is sprite position + 4, 4
 Bottom-right is sprite-position + C, C
 
+But when checking for collisions I still need to offset the axis that isn't moving
+like for moving right, I don't want to check the Y coorinate of the top of the sprite because that will
+certainly be on a background tile.
+
+ I want to chec the Y coordinate of the midpoint of the sprite?
+
+ NO. actually when moving left for example, need to check the top left edge
+ and the bottom left edge
+
+maybe I should pass another argument for the off-axis offset - then I can call this twice
+
+ there's probably a shortcut to this. since everything has to be on 8x8 blocks, it
+ could probably be simplified a great deal on this wall detection
+
+ I could start by doing it the stupid way...and not have to check more than once
+
+ But when I need to check collisions with ghosts, that might be closer than 8x8 blocks.
+ Interesting
+
 

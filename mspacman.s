@@ -39,6 +39,7 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 TARGET_X    = $0300     ; New x position for sprite when computing movement
 TARGET_Y    = $0301     ; New Y position for sprite when computing movement
 BG_COLLISION    = $0302 ; will be writing the current background tile here
+PLAYER_DIRECTION    = $0303 ; curent direction of player
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -53,6 +54,8 @@ JOY_DOWN = $04
 JOY_LEFT = $02
 JOY_RIGHT = $01
 
+PLAYER_OFFSET_TOP_LEFT = $04
+PLAYER_OFFSET_BOTTOM_RIGHT = $0C
 
 ; --- Game Constants
 ; Use these to check for collisions with screen boundaries
@@ -220,35 +223,55 @@ CheckUp:
         and #JOY_UP
         beq CheckDown
         ; up was pressed....
-        lda YPosition
-        dec                     ; This just decrements a single unit. If speed changes, do it here!
+        lda YPosition           ; moving UP, start with sprite Y position. subtract speed(1) to move UP and add offset (4) to get top edge of 8x8 block
+        clc
+        adc #$03
         sta YPosition
+        lda XPosition
+        clc
+        adc #$08
+        sta XPosition
         jmp ReturnGetTargetCoordinate
 CheckDown:
         lda Direction
         and #JOY_DOWN
         beq CheckLeft    ; Down not pressed either,
         ; down pressed
-        lda YPosition
-        inc
+        lda YPosition           ; moving DOWN. start with sprite Y position. add speed (1) to move down and add offset (C) to get bottom edge of 8x8 block
+        clc
+        adc #$0D
         sta YPosition
+        lda XPosition
+        clc
+        adc #$08
+        sta XPosition
         jmp ReturnGetTargetCoordinate
 CheckLeft:
         lda Direction
         and #JOY_LEFT        ; Check left
         beq CheckRight  ; Left no pressed, check the last one
         ; Left pressed
-        lda XPosition
-        dec
+        lda XPosition        ; moving LEFT. start with sprite X position. subtract speed(1) to move LEFT and add OFFSET (4) to get left edge of inner 8x8 block
+        clc
+        adc #$03
         sta XPosition
+        lda YPosition
+        clc
+        adc #$08
+        sta YPosition
         jmp ReturnGetTargetCoordinate
 CheckRight:
         lda Direction
         and #JOY_RIGHT        ; Check right
         beq ReturnGetTargetCoordinate   ; right not pressed, done checking
-        lda XPosition
-        inc
+        lda XPosition         ; moving RIGHT. start with sprite X position. add speed(1) to move right and add OFFSET (C) to get right edge of inner 8x8 block
+        clc
+        adc #$0D
         sta XPosition
+        lda YPosition
+        clc
+        adc #$08
+        sta YPosition
 ReturnGetTargetCoordinate:
         ; all done
         pld                     ; pull back direct register
@@ -302,6 +325,45 @@ ReturnGetTargetCoordinate:
         rts                     ; return to caller
 .endproc
 
+;
+.proc MovePlayer
+MoveCheckUp:
+    lda PLAYER_DIRECTION
+    and #JOY_UP
+    beq MoveCheckDown
+    ; up was pressed....
+    lda OAMMIRROR + $01
+    dec
+    sta OAMMIRROR + $01
+    rts
+MoveCheckDown:
+    lda PLAYER_DIRECTION
+    and #JOY_DOWN
+    beq MoveCheckLeft
+    lda OAMMIRROR + $01
+    inc
+    sta OAMMIRROR + $01
+    rts
+MoveCheckLeft:
+    lda PLAYER_DIRECTION
+    and #JOY_LEFT
+    beq MoveCheckRight
+    lda OAMMIRROR
+    dec
+    sta OAMMIRROR
+    rts
+MoveCheckRight:
+    lda PLAYER_DIRECTION
+    and #JOY_RIGHT
+    beq MoveCheckDone
+    lda OAMMIRROR
+    inc
+    sta OAMMIRROR
+MoveCheckDone:
+    rts
+.endproc
+
+
 ; ---
 ; after reset handler will jump to here
 ; ---
@@ -315,10 +377,16 @@ Joypad:
 ;    lda JOY1B
 ;    sta JOY1BW
 
+    ; Check if any direction currently pressed
+    lda JOY1A
+    and #$0f           ; B, Select, Start, Up, Down, Left, Right
+    beq CheckDirection ; no direction held, skip part 1
+HandleActiveJoypadInput:
+    ; Joypad direction currently held. Try that movement first
     ; Get ready to call GetTargetCoordinate
-    ; ; Direction, XPosition (inout), YPosition (inout)
     tsx     ; save current stack pointer before pushing things for subroutine
-    pha     ; push the direction, already in a
+    lda JOY1AW
+    pha     ; push the direction
     lda OAMMIRROR           ; Get current X position
     pha                     ; push it onto the stack before call
     lda OAMMIRROR + $01     ; Get current Y Position
@@ -329,16 +397,9 @@ Joypad:
     pla                     ; Pull the modified target X position
     sta TARGET_X            ; Save it in memory
     txs                     ; restore stack pointer to before the call
-
     ; now have candidate coordinates in TARGET_X and TARGET_Y
-    ; first just update OAMMIRROR to test movement
-    lda TARGET_X
-    sta OAMMIRROR
-    lda TARGET_Y
-    sta OAMMIRROR + $01
 
-    ; Now check positions for wall tile
-    tsx ; save old stack pointer before GetWallTile subroutine
+    tsx                     ; save old stack pointer before GetWallTile subroutine
     lda TARGET_X
     pha
     lda TARGET_Y
@@ -347,8 +408,21 @@ Joypad:
     pha
     jsr GetWallTile
     pla                     ; pull the return value back to a
+    txs                     ; restore stack pointer to before the call
+    ; tile now in A
     sta BG_COLLISION        ; for debugging
-    txs
+    ; Check if it is a background tile - 00
+    bne CheckDirection      ; The joypad attempted to move us into a wall, so ignore it and try to process existing movement
+    ; at this point, joypad movement is good!
+    lda JOY1AW              ; store existing joypad movement ...
+    sta PLAYER_DIRECTION    ; ... into PLAYER_DIRECTION
+    ; don't need to check walls again...
+    ; at this point, new targets have been checked. But these are the targets for the inner block and not the sprite
+    jsr MovePlayer          ; move the player according to PLAYER_DIRECTION
+CheckDirection:
+    ; TODO: Check if existing direction collides with a wall
+    jmp FinishMovePlayer
+FinishMovePlayer:
     jmp GameLoop
 .endproc
 ; ---
