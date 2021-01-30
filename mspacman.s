@@ -36,8 +36,8 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; ---
 
 ; --- Memory Map WRAM (just the layout of memory locations)
-HOR_SPEED   = $0300     ; The horizontal speed
-VER_SPEED   = $0301     ; the vertical speed
+TARGET_X    = $0300     ; New x position for sprite when computing movement
+TARGET_Y    = $0301     ; New Y position for sprite when computing movement
 HOR_OFFSET  = $0302     ; the sprite-edge offset for x
 VER_OFFSET  = $0303     ; the sprite-edge offset for y
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
@@ -120,7 +120,7 @@ Level1Map:          .incbin "level1.tlm"
     lda #$80        ; push CGRAM destination address to stack
     pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
     pea MsPacmanPalette   ; Push paletes source address to stack
-    pea $0008       ; push count of bytes (8 / $08) to transfer to stack
+    pea $0020       ; push count of bytes (32 / $20) to transfer to stack
     jsr LoadCGRAM   ; transfer color data into CGRAM
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -190,11 +190,6 @@ OAMLoop:
     lda #%0000010  ; this sets sprites to larger size - 16x16
     sta OAMMIRROR, X
 
-    ; set initial horizontal and vertical speed
-    lda #SPRITE_SPEED
-    sta HOR_SPEED
-    sta VER_SPEED
-
     ; make objects visible - and BG1!
     lda #$11
     sta TM
@@ -211,13 +206,65 @@ OAMLoop:
 .endproc
 ; ---
 
+; Direction, XPosition (inout), YPosition (inout)
+.proc   GetTargetCoordinateFromDirection
+        phx                     ; save old stack pointer
+        ; create a frame pointer
+        phd                     ; push direct register to stack
+        tsc                     ; transfer stack to ...
+        tcd                     ; direct register
+        ; constants to access args on stack with direct addressing
+        YPosition    = $07      ;
+        XPosition    = $08
+        Direction    = $09      ; Direction bits from joystick
+CheckUp:
+        lda Direction
+        and #JOY_UP
+        beq CheckDown
+        ; up was pressed....
+        lda YPosition
+        dec                     ; This just decrements a single unit. If speed changes, do it here!
+        sta YPosition
+        jmp ReturnGetTargetCoordinate
+CheckDown:
+        lda Direction
+        and #JOY_DOWN
+        beq CheckLeft    ; Down not pressed either,
+        ; down pressed
+        lda YPosition
+        inc
+        sta YPosition
+        jmp ReturnGetTargetCoordinate
+CheckLeft:
+        lda Direction
+        and #JOY_LEFT        ; Check left
+        beq CheckRight  ; Left no pressed, check the last one
+        ; Left pressed
+        lda XPosition
+        dec
+        sta XPosition
+        jmp ReturnGetTargetCoordinate
+CheckRight:
+        lda Direction
+        and #JOY_RIGHT        ; Check right
+        beq ReturnGetTargetCoordinate   ; right not pressed, done checking
+        lda XPosition
+        inc
+        sta XPosition
+ReturnGetTargetCoordinate:
+        ; all done
+        pld                     ; pull back direct register
+        plx                     ; restore old stack pointer into x
+        rts                     ; return to caller
+.endproc
+
+
 ; ---
 ; Check wall collision
 ; params: XPosition: .byte, YPosition: .byte
 ; returns: tile: .byte
 ; ---
 .proc   GetWallTile
-        .byte $42, $00          ; breakdance
         phx                     ; save old stack pointer
         ; create a frame pointer
         phd                     ; push direct register to stack
@@ -267,61 +314,39 @@ OAMLoop:
 Joypad:
     lda JOY1A
     sta JOY1AW
-    lda JOY1B
-    sta JOY1BW
+;    lda JOY1B
+;    sta JOY1BW
 
-CheckUp:
-    lda JOY1AW
-    and #JOY_UP
-    beq CheckDown
-    ; up was pressed....
-    lda #$ff        ; -1 means dig up, stupid
-    sta VER_SPEED
-    stz HOR_SPEED   ; only cardinal directions
-    jmp CheckWalls
-CheckDown:
-    lda JOY1AW
-    and #JOY_DOWN
-    beq CheckLeft    ; Down not pressed either,
-    ; down pressed
-    lda #$01        ; down pressed, dig down
-    sta VER_SPEED
-    stz HOR_SPEED   ; only cardinal directions
-    jmp CheckWalls
-CheckLeft:
-    lda JOY1AW
-    and #JOY_LEFT        ; Check left
-    beq CheckRight  ; Left no pressed, check the last one
-    ; Left pressed
-    lda #$ff        ; -1, go left
-    sta HOR_SPEED
-    stz VER_SPEED   ; only cardinal directions
-    jmp CheckWalls
-CheckRight:
-    lda JOY1AW
-    and #JOY_RIGHT        ; Check right
-    beq CheckWalls   ; nothing pressed, done checking buttons
-    lda #$01        ; +1, go right
-    sta HOR_SPEED
-    stz VER_SPEED   ; only cardinal directions
-;    jmp CheckWalls
-CheckWalls:
-    tsx ; save old stack pointer before subroutine
-    ; TODO: Check the direction for figuring out what to add to current X/Y coordinates
+    ; Get ready to call GetTargetCoordinate
+    ; ; Direction, XPosition (inout), YPosition (inout)
+    tsx     ; save current stack pointer before pushing things for subroutine
+    pha     ; push the direction, already in a
+    lda OAMMIRROR           ; Get current X position
+    pha                     ; push it onto the stack before call
+    lda OAMMIRROR + $01     ; Get current Y Position
+    pha                     ; push it onto the stack before call
+    jsr GetTargetCoordinateFromDirection    ; get the target coordinator
+    pla                     ; Pull the modified target Y Position
+    sta TARGET_Y            ; Save it in memory
+    pla                     ; Pull the modified target X position
+    sta TARGET_X            ; Save it in memory
+    txs                     ; restore stack pointer to before the call
 
-    ; game logic: move the sprites
-    lda OAMMIRROR           ; load the horizontal position of the first sprite, which is the first byte at OAMMIRROR
-    clc                     ; clear carry flag because we'll be adding and want to make sure it's not set
-    adc HOR_SPEED           ; Add speed to the x position to get new x position
-    sta OAMMIRROR       ; store new x position of sprite
-    pha                 ; push new x position to stack since we will be calling
-    lda OAMMIRROR + $01     ; load current y position of first sprite
-    clc
-    adc VER_SPEED
-    sta OAMMIRROR + $01     ; store new y position of sprite
+    ; now have candidate coordinates in TARGET_X and TARGET_Y
+    ; first just update OAMMIRROR to test movement
+    lda TARGET_X
+    sta OAMMIRROR
+    lda TARGET_Y
+    sta OAMMIRROR + $01
+
+    ; Now check positions for wall tile
+    tsx ; save old stack pointer before GetWallTile subroutine
+    lda TARGET_X
+    pha
+    lda TARGET_Y
     pha
     lda #$00
-    pha                     ; push an empty byte
+    pha
     jsr GetWallTile
     pla                     ; pull the return value back to a
     sta BG_COLLISION        ; for debugging
