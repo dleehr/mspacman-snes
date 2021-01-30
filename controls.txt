@@ -67,3 +67,48 @@ Not working as I expected.
 Instead of stopping i should store some values to memory and peek at them.
 maybe add a stop button too?
 more for tomorrow
+
+Fixed all that
+
+but now if there's a wall and I press DOWN, RIGHT movement stops immediately
+
+need to continue moving right until there's a gap to the bottom, then move down and not right anymore
+
+do I need a subroutine to check the collision along a direction?
+
+
+Added a HOR_SPEED_LAST and VER_SPEED_LAST
+
+scribbled this down before bed Jan 29:
+
+Check d pad
+If direction moves into an open square, set last successful direction and jump to update
+If not, leave last successful direction alone
+
+Also if no direction pressed...
+
+Check last successful direction and see if it moves into an open square
+If so, move
+
+Formalizing:
+
+Check the D-Pad direction
+if actively held direction:
+    Compute target X/Y coordinate for leading edge based on direction and current position
+    Check if target X/Y coordinate is an open tile (already a subroutine)
+    If open:
+        save joystick movement as player direction
+        jump to movement
+    if not open
+        # joystick is pressing into a wall, ignore it
+
+else (no joystick movement):
+    compute target x/y coordinate for leading edge based on player direction and current position
+    Check if target x/y coordinate is an open tile (already a subroutine)
+    if open:
+        jump to movement
+    if not open
+        set player direction to 0,0
+
+movement:
+    move by player direction
