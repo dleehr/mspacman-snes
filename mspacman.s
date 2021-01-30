@@ -211,6 +211,51 @@ OAMLoop:
 .endproc
 ; ---
 
+; ---
+; Check wall collision
+; params: XPosition: .byte, YPosition: .byte
+; returns: tile: .byte
+; ---
+.proc   GetWallTile
+        .byte $42, $00          ; breakdance
+        phx                     ; save old stack pointer
+        ; create a frame pointer
+        phd                     ; push direct register to stack
+        tsc                     ; transfer stack to ...
+        tcd                     ; direct register
+        ; constants to access args on stack with direct addressing
+        Tile         = $07       ;
+        YPosition    = $08
+        XPosition    = $09
+        ; Check the wall
+        lda YPosition
+        rep #$20            ; set A to 16-bit
+        and #$00f8
+        asl A
+        asl A
+        asl A
+        pha                  ; push A
+        sep #$20        ; set A back to 8-bit since it comes from the stack
+        lda XPosition        ; load x position into A
+        rep #$20            ; set A to 16-bit
+        and #$00f8
+        lsr A                ; Divide
+        lsr A                ; by 4 - because we divide y 8 and then double
+        clc
+        adc $01, S          ; add y index to x index
+        ; now A has the offset of the tile
+        ; transfer it to x
+        tax
+        pla                 ; clear up stack
+        sep #$20        ; set A back to 8-bit
+        lda Level1Map, X
+        ; A now has the lower byte of the background tile. 00 is empty. lower bits on upper byte could be set but we don't use that many
+        sta Tile
+        ; all done
+        pld                     ; pull back direct register
+        plx                     ; restore old stack pointer into x
+        rts                     ; return to caller
+.endproc
 
 ; ---
 ; after reset handler will jump to here
@@ -224,7 +269,7 @@ Joypad:
     sta JOY1AW
     lda JOY1B
     sta JOY1BW
-    ; Check up/down direction
+
 CheckUp:
     lda JOY1AW
     and #JOY_UP
@@ -232,12 +277,8 @@ CheckUp:
     ; up was pressed....
     lda #$ff        ; -1 means dig up, stupid
     sta VER_SPEED
-    lda #TOP_OFFSET
-    sta VER_OFFSET
     stz HOR_SPEED   ; only cardinal directions
-    lda #LEFT_OFFSET
-    sta HOR_OFFSET
-    jmp CheckTopWall
+    jmp CheckWalls
 CheckDown:
     lda JOY1AW
     and #JOY_DOWN
@@ -245,12 +286,8 @@ CheckDown:
     ; down pressed
     lda #$01        ; down pressed, dig down
     sta VER_SPEED
-    lda #BOTTOM_OFFSET
-    sta VER_OFFSET
     stz HOR_SPEED   ; only cardinal directions
-    lda #LEFT_OFFSET
-    sta HOR_OFFSET
-    jmp CheckBottomWall
+    jmp CheckWalls
 CheckLeft:
     lda JOY1AW
     and #JOY_LEFT        ; Check left
@@ -258,95 +295,37 @@ CheckLeft:
     ; Left pressed
     lda #$ff        ; -1, go left
     sta HOR_SPEED
-    lda #LEFT_OFFSET
-    sta HOR_OFFSET
     stz VER_SPEED   ; only cardinal directions
-    lda #TOP_OFFSET
-    sta VER_OFFSET
-    jmp CheckLeftWall
+    jmp CheckWalls
 CheckRight:
     lda JOY1AW
     and #JOY_RIGHT        ; Check right
-    beq CheckExistingHorizontalMovement   ; nothing pressed, done checking buttons
+    beq CheckWalls   ; nothing pressed, done checking buttons
     lda #$01        ; +1, go right
     sta HOR_SPEED
-    lda #RIGHT_OFFSET
-    sta HOR_OFFSET
     stz VER_SPEED   ; only cardinal directions
-    lda #TOP_OFFSET
-    sta VER_OFFSET
-    jmp CheckRightWall
-; Nothing pressed, check existing movement
-CheckExistingHorizontalMovement:
-    lda HOR_SPEED
-    ; if zero do nothing
-    beq CheckExistingVerticalMovement
-    ; if -1, CheckLeftWall
-    bmi CheckLeftWall
-    ; if 1, CheckRightWall
-    bpl CheckRightWall
-CheckExistingVerticalMovement:
-    lda VER_SPEED
-    ; if zero do nothing
-    beq UpdatePosition
-    ; if -1 check top wall
-    bmi CheckTopWall
-    ; if 1 check bottom wall
-    bpl CheckBottomWall
-CheckLeftWall:
-CheckRightWall:
-CheckTopWall:
-CheckBottomWall:
-CheckAgainstBackground:
-    rep #$20            ; set A to 16-bit so that we can transfer it to X
-    lda OAMMIRROR + $01     ; load y position into A
-    clc
-    adc VER_SPEED           ; add the veritcal speed to get the new y coordinate
-    clc
-    adc VER_OFFSET          ; handle top/bottom offset
-    and #$00f8
-    asl A
-    asl A
-    asl A
-    pha                  ; push A
-    lda OAMMIRROR        ; load x position into A
-    clc
-    adc HOR_SPEED        ; add the horizontal speed to get the new x coordinate
-    ; the x position of the sprite is 5 pixels to the left of the character
-    ; so we should check for collisions 5 pixels to the left
-    clc
-    adc HOR_OFFSET             ; handle left/right offset
-    and #$00f8
-    lsr A                ; Divide
-    lsr A                ; by 4 - because we divide y 8 and then double
-    clc
-    adc $01, S          ; add y index to x index
-    ; now A has the offset of the tile
-    ; transfer it to x
-    tax
-    pla                 ; clear up stack
-    lda Level1Map, X
-    sta BG_COLLISION    ; for debugging
-    sep #$20        ; set A back to 8-bit
-    ; A now has the lower byte of the background tile. 00 is empty. lower bits on upper byte could be set but we don't use that many
-    beq UpdatePosition   ; target tile is empty, go ahed with move
-    ; stop
-    stz HOR_SPEED
-    stz VER_SPEED
-UpdatePosition:
+;    jmp CheckWalls
+CheckWalls:
+    tsx ; save old stack pointer before subroutine
+    ; TODO: Check the direction for figuring out what to add to current X/Y coordinates
+
     ; game logic: move the sprites
     lda OAMMIRROR           ; load the horizontal position of the first sprite, which is the first byte at OAMMIRROR
     clc                     ; clear carry flag because we'll be adding and want to make sure it's not set
     adc HOR_SPEED           ; Add speed to the x position to get new x position
     sta OAMMIRROR       ; store new x position of sprite
-
-
-; move sprite 1 vertically
-    ; check upper collision boundary
+    pha                 ; push new x position to stack since we will be calling
     lda OAMMIRROR + $01     ; load current y position of first sprite
     clc
     adc VER_SPEED
     sta OAMMIRROR + $01     ; store new y position of sprite
+    pha
+    lda #$00
+    pha                     ; push an empty byte
+    jsr GetWallTile
+    pla                     ; pull the return value back to a
+    sta BG_COLLISION        ; for debugging
+    txs
     jmp GameLoop
 .endproc
 ; ---
