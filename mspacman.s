@@ -112,7 +112,7 @@ Level1Map:          .incbin "level1.tlm"
     lda #$00        ; push CGRAM destination address to stack
     pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
     pea Level1Palette   ; Push paletes source address to stack
-    pea $0008       ; push count of bytes (8 / $08) to transfer to stack
+    pea $000A       ; push count of bytes (8 / $08) to transfer to stack
     jsr LoadCGRAM   ; transfer color data into CGRAM
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -207,125 +207,124 @@ OAMLoop:
 .endproc
 ; ---
 
-; Direction, XPosition (inout), YPosition (inout)
-.proc   GetTargetCoordinateFromDirection
-        phx                     ; save old stack pointer
-        ; create a frame pointer
-        phd                     ; push direct register to stack
-        tsc                     ; transfer stack to ...
-        tcd                     ; direct register
-        ; constants to access args on stack with direct addressing
-        YPosition    = $07      ;
-        XPosition    = $08
-        Direction    = $09      ; Direction bits from joystick
+; Direction, XPosition, YPosition (inout)
+; based on an initial character position and a direction,
+; return the background tile that would be crossed
+
+.proc GetTargetBGTile
+     .byte $42, $00          ; breakdance
+    ; initial subroutine setup
+    phx                     ; save old stack pointer
+    ; create a frame pointer
+    phd                     ; push direct register to stack
+    tsc                     ; transfer stack to ...
+    tcd                     ; direct register
+    ; constants to access args on stack with direct addressing
+    Tile         = $07      ; return value
+    YPosition    = $08      ; Y position of 16x16 character sprite
+    XPosition    = $09      ; X position of 16x16 character sprite
+    Direction    = $0A      ; Direction bits from joystick
+    ; process direction to determine coordinate of leading edge
+ProcessDirection:
 CheckUp:
-        lda Direction
-        and #JOY_UP
-        beq CheckDown
-        ; up was pressed....
-        lda YPosition           ; moving UP, start with sprite Y position. subtract speed(1) to move UP and add offset (4) to get top edge of 8x8 block
-        clc
-        adc #$03
-        sta YPosition
-        lda XPosition
-        clc
-        adc #$08
-        sta XPosition
-        jmp ReturnGetTargetCoordinate
+    lda Direction
+    and #JOY_UP
+    beq CheckDown
+    ; up was pressed....
+    lda YPosition           ; moving UP, start with sprite Y position.
+    clc                     ; subtract speed(1) to move UP and add
+    adc #$04                ; offset (5) to get top edge of 8x8 block
+    sta YPosition
+    lda XPosition           ; Not moving on x-axis, just offset by the
+    clc                     ; left edge (+4) of the inner 8x8 block
+    adc #$04
+    sta XPosition
+    jmp ScaleToTileMap
 CheckDown:
-        lda Direction
-        and #JOY_DOWN
-        beq CheckLeft    ; Down not pressed either,
-        ; down pressed
-        lda YPosition           ; moving DOWN. start with sprite Y position. add speed (1) to move down and add offset (C) to get bottom edge of 8x8 block
-        clc
-        adc #$0D
-        sta YPosition
-        lda XPosition
-        clc
-        adc #$08
-        sta XPosition
-        jmp ReturnGetTargetCoordinate
+    lda Direction
+    and #JOY_DOWN
+    beq CheckLeft           ; Down not pressed either,
+    ; down pressed
+    lda YPosition           ; moving DOWN. start with sprite Y position.
+    clc                     ; add speed (1) to move down and add
+    adc #$0D                ; offset (C) to get bottom edge of 8x8 block
+    sta YPosition
+    lda XPosition           ; Not moving on x-axis, just offset by the
+    clc                     ; left edge (+4) of the inner 8x8 block
+    adc #$04
+    sta XPosition
+    jmp ScaleToTileMap
 CheckLeft:
-        lda Direction
-        and #JOY_LEFT        ; Check left
-        beq CheckRight  ; Left no pressed, check the last one
-        ; Left pressed
-        lda XPosition        ; moving LEFT. start with sprite X position. subtract speed(1) to move LEFT and add OFFSET (4) to get left edge of inner 8x8 block
-        clc
-        adc #$03
-        sta XPosition
-        lda YPosition
-        clc
-        adc #$08
-        sta YPosition
-        jmp ReturnGetTargetCoordinate
+    lda Direction
+    and #JOY_LEFT        ; Check left
+    beq CheckRight  ; Left no pressed, check the last one
+    ; Left pressed
+    lda XPosition        ; moving LEFT. start with sprite X position.
+    clc                  ; subtract speed(1) to move LEFT and
+    adc #$04             ; add OFFSET (5) to get left edge of inner 8x8 block
+    sta XPosition
+    lda YPosition           ; Not moving on y-axis, just offset by the
+    clc                     ; top edge (+5) of the inner 8x8 block
+    adc #$05
+    sta YPosition
+    jmp ScaleToTileMap
 CheckRight:
-        lda Direction
-        and #JOY_RIGHT        ; Check right
-        beq ReturnGetTargetCoordinate   ; right not pressed, done checking
-        lda XPosition         ; moving RIGHT. start with sprite X position. add speed(1) to move right and add OFFSET (C) to get right edge of inner 8x8 block
-        clc
-        adc #$0D
-        sta XPosition
-        lda YPosition
-        clc
-        adc #$08
-        sta YPosition
-ReturnGetTargetCoordinate:
-        ; all done
-        pld                     ; pull back direct register
-        plx                     ; restore old stack pointer into x
-        rts                     ; return to caller
+    lda Direction
+    and #JOY_RIGHT        ; Check left
+    beq NoDirection       ; Right not pressed, check the last one
+    ; Left pressed
+    lda XPosition        ; moving LEFT. start with sprite X position.
+    clc                  ; subtract speed(1) to move LEFT and
+    adc #$04             ; add OFFSET (5) to get left edge of inner 8x8 block
+    sta XPosition
+    lda YPosition           ; Not moving on y-axis, just offset by the
+    clc                     ; top edge (+5) of the inner 8x8 block
+    adc #$05
+    sta YPosition
+    jmp ScaleToTileMap
+NoDirection:
+    lda XPosition           ; no direction pressed
+    adc #$04                ; just correct for
+    sta XPosition           ; sprite offset
+    lda YPosition
+    adc #$05
+    sta YPosition
+    ; divide by grid size to get coordinates in tile map
+ScaleToTileMap:
+    lda YPosition
+    rep #$20            ; set A to 16-bit
+    and #$00f8          ; Clear high bits because we only had 8 significant bits. Clear lower 3 because we're shifting those away
+    asl A
+    asl A
+    asl A
+    pha                  ; push A
+    sep #$20        ; set A back to 8-bit since it comes from the stack
+    lda XPosition        ; load x position into A
+    rep #$20            ; set A to 16-bit
+    and #$00f8
+    lsr A                ; Divide
+    lsr A                ; by 4 - because we divide y 8 and then double
+    clc
+    adc $01, S          ; add y index to x index
+    ; now A has the offset of the tile
+    ; transfer it to x
+    tax
+    pla                 ; clear up stack
+    sep #$20        ; set A back to 8-bit
+    ; index into the tile map to get the tile
+LookupTile:
+    lda Level1Map, X
+    ; A now has the lower byte of the background tile.
+    ; 00 means empty. lower bits on upper byte could be set but we don't use that many
+    sta Tile
+    ; subroutine cleanup and return
+ReturnFromGetTargetBGTile:
+    ; all done
+    pld                     ; pull back direct register
+    plx                     ; restore old stack pointer into x
+    rts                     ; return to caller
 .endproc
 
-
-; ---
-; Check wall collision
-; params: XPosition: .byte, YPosition: .byte
-; returns: tile: .byte
-; ---
-.proc   GetWallTile
-        phx                     ; save old stack pointer
-        ; create a frame pointer
-        phd                     ; push direct register to stack
-        tsc                     ; transfer stack to ...
-        tcd                     ; direct register
-        ; constants to access args on stack with direct addressing
-        Tile         = $07       ;
-        YPosition    = $08
-        XPosition    = $09
-        ; Check the wall
-        lda YPosition
-        rep #$20            ; set A to 16-bit
-        and #$00f8
-        asl A
-        asl A
-        asl A
-        pha                  ; push A
-        sep #$20        ; set A back to 8-bit since it comes from the stack
-        lda XPosition        ; load x position into A
-        rep #$20            ; set A to 16-bit
-        and #$00f8
-        lsr A                ; Divide
-        lsr A                ; by 4 - because we divide y 8 and then double
-        clc
-        adc $01, S          ; add y index to x index
-        ; now A has the offset of the tile
-        ; transfer it to x
-        tax
-        pla                 ; clear up stack
-        sep #$20        ; set A back to 8-bit
-        lda Level1Map, X
-        ; A now has the lower byte of the background tile. 00 is empty. lower bits on upper byte could be set but we don't use that many
-        sta Tile
-        ; all done
-        pld                     ; pull back direct register
-        plx                     ; restore old stack pointer into x
-        rts                     ; return to caller
-.endproc
-
-;
 .proc MovePlayer
 MoveCheckUp:
     lda PLAYER_DIRECTION
@@ -391,33 +390,17 @@ HandleActiveJoypadInput:
     pha                     ; push it onto the stack before call
     lda OAMMIRROR + $01     ; Get current Y Position
     pha                     ; push it onto the stack before call
-    jsr GetTargetCoordinateFromDirection    ; get the target coordinator
-    pla                     ; Pull the modified target Y Position
-    sta TARGET_Y            ; Save it in memory
-    pla                     ; Pull the modified target X position
-    sta TARGET_X            ; Save it in memory
-    txs                     ; restore stack pointer to before the call
-    ; now have candidate coordinates in TARGET_X and TARGET_Y
-
-    tsx                     ; save old stack pointer before GetWallTile subroutine
-    lda TARGET_X
-    pha
-    lda TARGET_Y
-    pha
     lda #$00
-    pha
-    jsr GetWallTile
-    pla                     ; pull the return value back to a
+    pha                     ; tile return value
+    jsr GetTargetBGTile
+    pla
+    sta BG_COLLISION
     txs                     ; restore stack pointer to before the call
-    ; tile now in A
-    sta BG_COLLISION        ; for debugging
     ; Check if it is a background tile - 00
-    bne CheckDirection      ; The joypad attempted to move us into a wall, so ignore it and try to process existing movement
+    ; bne CheckDirection      ; The joypad attempted to move us into a wall, so ignore it and try to process existing movement
     ; at this point, joypad movement is good!
     lda JOY1AW              ; store existing joypad movement ...
     sta PLAYER_DIRECTION    ; ... into PLAYER_DIRECTION
-    ; don't need to check walls again...
-    ; at this point, new targets have been checked. But these are the targets for the inner block and not the sprite
     jsr MovePlayer          ; move the player according to PLAYER_DIRECTION
 CheckDirection:
     ; TODO: Check if existing direction collides with a wall
