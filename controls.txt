@@ -161,4 +161,21 @@ maybe I should pass another argument for the off-axis offset - then I can call t
  But when I need to check collisions with ghosts, that might be closer than 8x8 blocks.
  Interesting
 
+2021-01-31
 
+checking both corners of movement
+
+I have
+ GetTargetCoordinateFromDirection(Direction, X, Y)
+ GetWallTile(X, Y) -> Tile byte
+
+In GetTargetCoordinate, I determine the edge from the movement vector
+
+
+When moving DOWN and sprite should collide on bottom right edge, this is not detected correctly
+
+One way to describe it - Should only allow TURNS when aligned to a pixel grid
+- this implies state/memory
+
+Other way to describe it - and my previous idea - both covered tiles (top left and bottom right)
+need to be zero
