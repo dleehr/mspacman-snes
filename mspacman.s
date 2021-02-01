@@ -41,6 +41,12 @@ TARGET_Y    = $0301     ; New Y position for sprite when computing movement
 BG_TILE1    = $0302     ; will be writing the current background tiles here
 BG_TILE2    = $0303     ;
 PLAYER_DIRECTION    = $0304 ; curent direction of player
+TARGET_X1   = $0310
+TARGET_Y1   = $0311
+TARGET_X2   = $0312
+TARGET_Y2   = $0313
+BG_TILE1T   = $0320     ; temp
+BG_TILE2T   = $0321     ; temp
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -257,7 +263,6 @@ OAMLoop:
 ; return the background tile that would be crossed
 ; Can't just do top-left and bottom right. Edges need to be based on movement direction
 .proc GetTargetBGTiles
-     .byte $42, $00          ; breakdance
     ; initial subroutine setup
     phx                     ; save old stack pointer
     ; create a frame pointer
@@ -270,21 +275,12 @@ OAMLoop:
     YPosition    = $09      ; Y position of 16x16 character sprite
     XPosition    = $0A      ; X position of 16x16 character sprite
     Direction    = $0B      ; Direction bits from joystick
-    ; process direction to determine coordinate of leading edge
-    ; TODO: need a second pair of bytes for the second edge
-    ; Either assign a static memory address or create a local, stack-relative place
-    ; Trying this
-    YPosition2   = $0C      ; just assigned these. does it crash?
-    XPosition2   = $0D
+    OFFSET = $07
 ProcessDirection:
-    ; first correct for sprite offset
-    lda XPosition           ;
-    clc
-    adc #$05                ; just correct for
-    sta XPosition           ; sprite offset
+    ; Even in my temporary no-offset debugging, the y coordinate is still off by one
+    ; so correct for that
     lda YPosition
-    clc
-    adc #$05
+    inc
     sta YPosition
 CheckUp:
     lda Direction
@@ -292,79 +288,87 @@ CheckUp:
     beq CheckDown
     ; up was pressed....
     lda YPosition           ; moving UP, start with sprite Y position.
-    dec
-    sta YPosition
-    sta YPosition2
+    dec                     ; just consider the top edge
+    sta TARGET_Y1
+    sta TARGET_Y2
     lda XPosition
+    sta TARGET_X1
     clc
-    adc #$07
-    sta XPosition2
-    jmp ComputeTopLeft
+    adc #OFFSET
+    sta TARGET_X2
+    jmp ComputeTile1
 CheckDown:
     lda Direction
     and #JOY_DOWN
     beq CheckLeft           ; Down not pressed either,
     ; down pressed
     lda YPosition           ; moving DOWN. start with sprite Y position.
-    inc
-    sta YPosition
-    sta YPosition2
-    lda XPosition
     clc
-    adc #$07
-    sta XPosition2
-    jmp ComputeTopLeft
+    adc #(OFFSET + 1)       ; have to consider the bottom edge
+    sta TARGET_Y1
+    sta TARGET_Y2
+    lda XPosition
+    sta TARGET_X1
+    clc
+    adc #OFFSET
+    sta TARGET_X2
+    jmp ComputeTile1
 CheckLeft:
     lda Direction
     and #JOY_LEFT        ; Check left
     beq CheckRight  ; Left no pressed, check the last one
     ; Left pressed
     lda XPosition        ; moving LEFT. start with sprite X position.
-    dec
-    sta XPosition
-    sta XPosition2
+    dec                  ; just consider the left edge
+    sta TARGET_X1
+    sta TARGET_X2
     lda YPosition
+    sta TARGET_Y1
     clc
-    adc #$07
-    sta YPosition2
-    jmp ComputeTopLeft
+    adc #OFFSET
+    sta TARGET_Y2
+    jmp ComputeTile1
 CheckRight:
-     .byte $42, $00          ; breakdance
     lda Direction
     and #JOY_RIGHT        ; Check left
-    beq ComputeTopLeft       ; Right not pressed, done checking
+    beq ComputeTile1       ; Right not pressed, done checking
     ; Right pressed
     lda XPosition        ; moving RIGHT
-    inc
-    sta XPosition
-    sta XPosition2
-    lda YPosition
     clc
-    adc #$07
-    sta YPosition2
-    jmp ComputeTopLeft
-ComputeTopLeft:
-    tsx
-    lda XPosition
-    pha
+    adc #(OFFSET + 1)    ; have to consider the right edge
+    sta TARGET_X1
+    sta TARGET_X2
     lda YPosition
+    sta TARGET_Y1
+    clc
+    adc #OFFSET
+    sta TARGET_Y2
+    jmp ComputeTile1
+ComputeTile1:
+    tsx
+    lda TARGET_X1
+    pha
+    lda TARGET_Y1
     pha                     ; Push Y Position
-    lda TileTL
-    pha                     ; Push Tile Top Left
+    lda #$00
+    pha                     ; Push Tile1
     jsr GetBGTile           ;
     pla                     ; Pull calculated tile out
     sta TileTL              ; save this as top-left tile
+    sta BG_TILE1T
     txs                     ; restore stack pointer
-ComputeBottomRight:
-    lda XPosition2
+ComputeTile2:
+    tsx
+    lda TARGET_X2
     pha
-    lda YPosition2
+    lda TARGET_Y2
     pha
-    lda TileBR
+    lda #$00
     pha
     jsr GetBGTile
     pla
     sta TileBR
+    sta BG_TILE2T
     txs
     ; subroutine cleanup and return
 ReturnFromGetTargetBGTile:
