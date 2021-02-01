@@ -1,0 +1,195 @@
+initial position: 68, 83
+(104, 131)
+
+Store a x direction and a y direction - initially 0
+
+read gamepad. direction is in JOY1AW
+
+; ;B, Select, Start, Up, Down, Left, Right
+lda JOY1AW
+and #0f
+
+1000 up
+0100 down
+0010 left
+0001 right
+
+if it's not zero, then a direction was pressed.
+
+    and #$08        ; Check the Up flag
+
+
+- if left:
+    check wall on left (currently no-op)
+    set x direction to left
+    set y direction to 0
+
+
+
+movement
+
+
+Checking if sprite would move into background
+
+divide y by 32 to get the row from the pixel
+then multiply the rows by 16 since there are 16 bytes per row.
+
+actually can just divide by 2 and clear the low bit
+
+divide x by 32 to get the column from the pixel
+add to above
+
+this is the offset into the map
+load that and see if it's zero
+if so, don't move!
+
+This is just for the top left corner. For moving down or right, need to check +1
+
+divide y by 16
+add to x / 32
+
+
+
+
+17 * 32 = 544 tiles offset
+
+I'm actually getting 131
+
+
+Initial Y coordinate is 0x83 or 131. what row is this? should be 16 or 17
+initial x coordinate is 68
+
+This target position should be more like 0x400
+
+I tweaked my shifting of y coordinate to get it into the ballpark but never really did the math
+
+Not working as I expected.
+Instead of stopping i should store some values to memory and peek at them.
+maybe add a stop button too?
+more for tomorrow
+
+Fixed all that
+
+but now if there's a wall and I press DOWN, RIGHT movement stops immediately
+
+need to continue moving right until there's a gap to the bottom, then move down and not right anymore
+
+do I need a subroutine to check the collision along a direction?
+
+
+Added a HOR_SPEED_LAST and VER_SPEED_LAST
+
+scribbled this down before bed Jan 29:
+
+Check d pad
+If direction moves into an open square, set last successful direction and jump to update
+If not, leave last successful direction alone
+
+Also if no direction pressed...
+
+Check last successful direction and see if it moves into an open square
+If so, move
+
+Formalizing:
+
+Check the D-Pad direction
+if actively held direction:
+    Compute target X/Y coordinate for leading edge based on direction and current position
+    Check if target X/Y coordinate is an open tile (already a subroutine)
+    If open:
+        save joystick movement as player direction
+        jump to movement
+    if not open
+        # joystick is pressing into a wall, ignore it
+
+else (no joystick movement):
+    compute target x/y coordinate for leading edge based on player direction and current position
+    Check if target x/y coordinate is an open tile (already a subroutine)
+    if open:
+        jump to movement
+    if not open
+        set player direction to 0,0
+
+movement:
+    move by player direction
+
+
+
+Ah, the collisions and borders are actually a lot easier.
+I was considering the black space in non-00 tiles to be places we could go, but it's not
+It's a fixed offset - like a trench running through the middle.
+consider an 8x8 block centered UNDER the character (4px buffer on each side)
+don't let that block move onto a tile unless the tile is 0
+
+ 0123456789ABCDEF
+0
+1
+2
+3
+4    XXXXXXXX
+5    XXXXXXXX
+6    XXXXXXXX
+7    XXXXXXXX
+8    XXXXXXXX
+9    XXXXXXXX
+A    XXXXXXXX
+B    XXXXXXXX
+C
+D
+E
+F
+
+So top-left is sprite position + 4, 4
+Bottom-right is sprite-position + C, C
+
+But when checking for collisions I still need to offset the axis that isn't moving
+like for moving right, I don't want to check the Y coorinate of the top of the sprite because that will
+certainly be on a background tile.
+
+ I want to chec the Y coordinate of the midpoint of the sprite?
+
+ NO. actually when moving left for example, need to check the top left edge
+ and the bottom left edge
+
+maybe I should pass another argument for the off-axis offset - then I can call this twice
+
+ there's probably a shortcut to this. since everything has to be on 8x8 blocks, it
+ could probably be simplified a great deal on this wall detection
+
+ I could start by doing it the stupid way...and not have to check more than once
+
+ But when I need to check collisions with ghosts, that might be closer than 8x8 blocks.
+ Interesting
+
+2021-01-31
+
+checking both corners of movement
+
+I have
+ GetTargetCoordinateFromDirection(Direction, X, Y)
+ GetWallTile(X, Y) -> Tile byte
+
+In GetTargetCoordinate, I determine the edge from the movement vector
+
+
+When moving DOWN and sprite should collide on bottom right edge, this is not detected correctly
+
+One way to describe it - Should only allow TURNS when aligned to a pixel grid
+- this implies state/memory
+
+Other way to describe it - and my previous idea - both covered tiles (top left and bottom right)
+need to be zero
+
+This is going nowhere.
+
+Next steps:
+
+use a single 8x8 sprite with no offsets
+
+1. clear out tiles 2,3,4 DONE
+2. set tile 1 to just an empty block DONE
+3. set bg color to a grid box DONE
+4. remove offset logic DONE
+5. store x and y coordinates to a memory location for debugging DONE
+6. also store tile coordinates or return them
+7. debug that.

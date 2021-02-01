@@ -36,8 +36,17 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; ---
 
 ; --- Memory Map WRAM (just the layout of memory locations)
-HOR_SPEED   = $0300     ; The horizontal speed
-VER_SPEED   = $0301     ; the vertical speed
+TARGET_X    = $0300     ; New x position for sprite when computing movement
+TARGET_Y    = $0301     ; New Y position for sprite when computing movement
+BG_TILE1    = $0302     ; will be writing the current background tiles here
+BG_TILE2    = $0303     ;
+PLAYER_DIRECTION    = $0304 ; curent direction of player
+TARGET_X1   = $0310
+TARGET_Y1   = $0311
+TARGET_X2   = $0312
+TARGET_Y2   = $0313
+BG_TILE1T   = $0320     ; temp
+BG_TILE2T   = $0321     ; temp
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -45,12 +54,23 @@ OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 JOY1AW      = $0700     ;B, Select, Start, Up, Down, Left, Right
 JOY1BW      = $0701     ;A, X, L, R, iiii-ID
 
+
+; ---- Joypad bits
+JOY_UP = $08
+JOY_DOWN = $04
+JOY_LEFT = $02
+JOY_RIGHT = $01
+
 ; --- Game Constants
 ; Use these to check for collisions with screen boundaries
 SCREEN_LEFT     = $00   ; left screen boundary = 0
-SCREEN_RIGHT    = $ff   ; right screen boundary = 255
+SCREEN_RIGHT    = $df   ; right screen boundary = 25
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
+STARTING_X      = $68
+STARTING_Y      = $83
+PLAYER_OFFSET   = $04
+
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
@@ -93,7 +113,7 @@ Level1Map:          .incbin "level1.tlm"
     lda #$00        ; push CGRAM destination address to stack
     pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
     pea Level1Palette   ; Push paletes source address to stack
-    pea $0008       ; push count of bytes (8 / $08) to transfer to stack
+    pea $000A       ; push count of bytes (8 / $08) to transfer to stack
     jsr LoadCGRAM   ; transfer color data into CGRAM
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -102,7 +122,7 @@ Level1Map:          .incbin "level1.tlm"
     lda #$80        ; push CGRAM destination address to stack
     pha             ; through A (why not pea? - guess because that's 2 bytes and we only want 1?)
     pea MsPacmanPalette   ; Push paletes source address to stack
-    pea $0008       ; push count of bytes (8 / $08) to transfer to stack
+    pea $0020       ; push count of bytes (32 / $20) to transfer to stack
     jsr LoadCGRAM   ; transfer color data into CGRAM
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -141,13 +161,12 @@ Level1Map:          .incbin "level1.tlm"
     ; set up initial data in OAMRAM mirror, using X as index
     ldx #$00
     ; upper-left sprite, starts at halfway point
-    lda #(SCREEN_RIGHT/2 - SPRITE_SIZE); sprite 1, horizontal position to put at center of screen
+    lda #STARTING_X     ; starting X position for player
     sta OAMMIRROR, X    ; store A into OAMMIRROR memory location, offset by X (like c pointer arithmetic offset)
     inx                 ; increment index
-    lda #(SCREEN_BOTTOM/2 - SPRITE_SIZE) ; sprite 1, vertical position
+    lda #STARTING_Y     ; starting Y position for player
     sta OAMMIRROR, X
     inx
-    ; This below line needs to be updated for $1000
     lda #$00            ; sprite 1, name is 00
     sta OAMMIRROR, X
     inx
@@ -173,11 +192,6 @@ OAMLoop:
     lda #%0000010  ; this sets sprites to larger size - 16x16
     sta OAMMIRROR, X
 
-    ; set initial horizontal and vertical speed
-    lda #SPRITE_SPEED
-    sta HOR_SPEED
-    sta VER_SPEED
-
     ; make objects visible - and BG1!
     lda #$11
     sta TM
@@ -194,6 +208,211 @@ OAMLoop:
 .endproc
 ; ---
 
+.proc GetBGTile
+    phx                     ; save old stack pointer
+    ; create a frame pointer
+    phd                     ; push direct register to stack
+    tsc                     ; transfer stack to ...
+    tcd                     ; direct register
+    ; constants to access args on stack with direct addressing
+    Tile         = $07      ; return value
+    YPosition    = $08      ; Y position of 16x16 character sprite
+    XPosition    = $09      ; X position of 16x16 character sprite
+
+    lda YPosition
+    rep #$20            ; set A to 16-bit
+    and #$00f8          ; Clear high bits because we only had 8 significant bits. Clear lower 3 because we're shifting those away
+    asl A
+    asl A
+    asl A
+    pha                  ; push A
+    sep #$20        ; set A back to 8-bit since it comes from the stack
+    lda XPosition        ; load x position into A
+    rep #$20            ; set A to 16-bit
+    and #$00f8
+    lsr A                ; Divide
+    lsr A                ; by 4 - because we divide y 8 and then double
+    clc
+    adc $01, S          ; add y index to x index
+    ; now A has the offset of the tile
+    ; transfer it to x
+    tax
+    pla                 ; clear up stack
+    sep #$20        ; set A back to 8-bit
+    ; index into the tile map to get the tile
+
+    lda Level1Map, X
+    ; A now has the lower byte of the background tile.
+    ; 00 means empty. lower bits on upper byte could be set but we don't use that many
+    sta Tile
+    ; subroutine cleanup and return
+
+    pld                     ; pull back direct register
+    plx                     ; restore old stack pointer into x
+    rts                     ; return to caller
+.endproc
+
+; Direction, XPosition, YPosition (inout)
+; based on an initial character position and a direction,
+; return the background tile that would be crossed
+; Can't just do top-left and bottom right. Edges need to be based on movement direction
+.proc GetTargetBGTiles
+    ; initial subroutine setup
+    phx                     ; save old stack pointer
+    ; create a frame pointer
+    phd                     ; push direct register to stack
+    tsc                     ; transfer stack to ...
+    tcd                     ; direct register
+    ; constants to access args on stack with direct addressing
+    TileTL       = $07      ; return value
+    TileBR       = $08      ; return value
+    YPosition    = $09      ; Y position of 16x16 character sprite
+    XPosition    = $0A      ; X position of 16x16 character sprite
+    Direction    = $0B      ; Direction bits from joystick
+    OFFSET = $07
+ProcessDirection:
+    ; The top line of the SNES gets dropped so Y position needs to be of by one to correct
+    lda YPosition
+    clc
+    adc #(PLAYER_OFFSET + 1)
+    sta YPosition
+    lda XPosition
+    clc
+    adc #PLAYER_OFFSET
+    sta XPosition
+CheckUp:
+    lda Direction
+    and #JOY_UP
+    beq CheckDown
+    ; up was pressed....
+    lda YPosition           ; moving UP, start with sprite Y position.
+    dec                     ; just consider the top edge
+    sta TARGET_Y1
+    sta TARGET_Y2
+    lda XPosition
+    sta TARGET_X1
+    clc
+    adc #OFFSET
+    sta TARGET_X2
+    jmp ComputeTile1
+CheckDown:
+    lda Direction
+    and #JOY_DOWN
+    beq CheckLeft           ; Down not pressed either,
+    ; down pressed
+    lda YPosition           ; moving DOWN. start with sprite Y position.
+    clc
+    adc #(OFFSET + 1)       ; have to consider the bottom edge
+    sta TARGET_Y1
+    sta TARGET_Y2
+    lda XPosition
+    sta TARGET_X1
+    clc
+    adc #OFFSET
+    sta TARGET_X2
+    jmp ComputeTile1
+CheckLeft:
+    lda Direction
+    and #JOY_LEFT        ; Check left
+    beq CheckRight  ; Left no pressed, check the last one
+    ; Left pressed
+    lda XPosition        ; moving LEFT. start with sprite X position.
+    dec                  ; just consider the left edge
+    sta TARGET_X1
+    sta TARGET_X2
+    lda YPosition
+    sta TARGET_Y1
+    clc
+    adc #OFFSET
+    sta TARGET_Y2
+    jmp ComputeTile1
+CheckRight:
+    lda Direction
+    and #JOY_RIGHT        ; Check left
+    beq ComputeTile1       ; Right not pressed, done checking
+    ; Right pressed
+    lda XPosition        ; moving RIGHT
+    clc
+    adc #(OFFSET + 1)    ; have to consider the right edge
+    sta TARGET_X1
+    sta TARGET_X2
+    lda YPosition
+    sta TARGET_Y1
+    clc
+    adc #OFFSET
+    sta TARGET_Y2
+    jmp ComputeTile1
+ComputeTile1:
+    tsx
+    lda TARGET_X1
+    pha
+    lda TARGET_Y1
+    pha                     ; Push Y Position
+    lda #$00
+    pha                     ; Push Tile1
+    jsr GetBGTile           ;
+    pla                     ; Pull calculated tile out
+    sta TileTL              ; save this as top-left tile
+    sta BG_TILE1T
+    txs                     ; restore stack pointer
+ComputeTile2:
+    tsx
+    lda TARGET_X2
+    pha
+    lda TARGET_Y2
+    pha
+    lda #$00
+    pha
+    jsr GetBGTile
+    pla
+    sta TileBR
+    sta BG_TILE2T
+    txs
+    ; subroutine cleanup and return
+ReturnFromGetTargetBGTile:
+    ; all done
+    pld                     ; pull back direct register
+    plx                     ; restore old stack pointer into x
+    rts                     ; return to caller
+.endproc
+
+.proc MovePlayer
+MoveCheckUp:
+    lda PLAYER_DIRECTION
+    and #JOY_UP
+    beq MoveCheckDown
+    ; up was pressed....
+    lda OAMMIRROR + $01
+    dec
+    sta OAMMIRROR + $01
+    rts
+MoveCheckDown:
+    lda PLAYER_DIRECTION
+    and #JOY_DOWN
+    beq MoveCheckLeft
+    lda OAMMIRROR + $01
+    inc
+    sta OAMMIRROR + $01
+    rts
+MoveCheckLeft:
+    lda PLAYER_DIRECTION
+    and #JOY_LEFT
+    beq MoveCheckRight
+    lda OAMMIRROR
+    dec
+    sta OAMMIRROR
+    rts
+MoveCheckRight:
+    lda PLAYER_DIRECTION
+    and #JOY_RIGHT
+    beq MoveCheckDone
+    lda OAMMIRROR
+    inc
+    sta OAMMIRROR
+MoveCheckDone:
+    rts
+.endproc
+
 
 ; ---
 ; after reset handler will jump to here
@@ -205,59 +424,66 @@ OAMLoop:
 Joypad:
     lda JOY1A
     sta JOY1AW
-    lda JOY1B
-    sta JOY1BW
-    ; Check up/down direction
-CheckUp:
-    ; ;B, Select, Start, Up, Down, Left, Right
+;    lda JOY1B
+;    sta JOY1BW
+
+    ; Check if any direction currently pressed
+    lda JOY1A
+    and #$0f           ; B, Select, Start, Up, Down, Left, Right
+    beq CheckDirection ; no direction held, skip part 1
+HandleActiveJoypadInput:
+    ; Joypad direction currently held. Try that movement first
+    ; Get ready to call GetTargetCoordinate
+    tsx     ; save current stack pointer before pushing things for subroutine
     lda JOY1AW
-    and #$08        ; Check the Up flag
-    beq CheckDown
-    ; up was pressed....
-    lda #$ff        ; -1 means dig up, stupid
-    sta VER_SPEED
-    jmp CheckLeft
-CheckDown:
-    lda JOY1AW
-    and #$04        ; Check Down
-    beq VertStill   ; Down not pressed either, clear speed
-    ; down pressed
-    lda #$01        ; down pressed, dig down
-    sta VER_SPEED
-    jmp CheckLeft
-VertStill:
-    stz VER_SPEED
-CheckLeft:
-    lda JOY1AW
-    and #$02        ; Check left
-    beq CheckRight  ; Left no pressed, check the last one
-    ; Left pressed
-    lda #$ff        ; -1, go left
-    sta HOR_SPEED
-    jmp UpdatePosition
-CheckRight:
-    lda JOY1AW
-    and #$01        ; Check right
-    beq HorzStill   ; right not pressed, make horizontally still
-    lda #$01        ; +1, go right
-    sta HOR_SPEED
-    jmp UpdatePosition
-HorzStill:
-    stz HOR_SPEED
-UpdatePosition:
-    ; game logic: move the sprites
-    ; move sprite 1 horizontally
-    ; check collision left boundary
-    lda OAMMIRROR           ; load the horizontal position of the first sprite, which is the first byte at OAMMIRROR
-    clc                     ; clear carry flag because we'll be adding and want to make sure it's not set
-    adc HOR_SPEED           ; Add speed to the x position to get new x position
-    sta OAMMIRROR       ; store new x position of sprite
-; move sprite 1 vertically
-    ; check upper collision boundary
-    lda OAMMIRROR + $01     ; load current y position of first sprite
-    clc
-    adc VER_SPEED
-    sta OAMMIRROR + $01     ; store new y position of sprite
+    pha     ; push the direction
+    lda OAMMIRROR           ; Get current X position
+    pha                     ; push it onto the stack before call
+    lda OAMMIRROR + $01     ; Get current Y Position
+    pha                     ; push it onto the stack before call
+    ; now I push 00 twice. Could do a pea $0000 instead but i'll leave it here for consistency
+    lda #$00
+    pha                     ; tile 1 return value
+    lda #$00
+    pha                     ; tile 2 return value
+    jsr GetTargetBGTiles
+    pla
+    ; Check if tile empty
+    sta BG_TILE1
+    pla
+    sta BG_TILE2
+    txs                     ; restore stack pointer to before the call
+    ; Check if it is a background tile - 00
+    bne CheckDirection      ; The joypad attempted to move us into a wall, so ignore it and try to process existing movement
+    lda BG_TILE1
+    bne CheckDirection
+    ; at this point, joypad movement is good!
+    lda JOY1AW              ; store existing joypad movement ...
+    sta PLAYER_DIRECTION    ; ... into PLAYER_DIRECTION
+    jsr MovePlayer          ; move the player according to PLAYER_DIRECTION
+    jmp FinishMovePlayer
+CheckDirection:
+    tsx         ; save current stack pointer
+    lda PLAYER_DIRECTION ; load last good direction
+    pha
+    lda OAMMIRROR       ; current X position
+    pha
+    lda OAMMIRROR + $01 ; current Y position
+    pha
+    pea $0000           ; 2 bytes for target tiles
+    jsr GetTargetBGTiles
+    pla                 ; tile 1
+    sta BG_TILE1
+    pla
+    sta BG_TILE2
+    txs         ; restore stack pointer
+    ; Check if background tile
+    bne FinishMovePlayer
+    lda BG_TILE1
+    bne FinishMovePlayer
+    ; at this point, existing movement is good
+    jsr MovePlayer
+FinishMovePlayer:
     jmp GameLoop
 .endproc
 ; ---
@@ -398,7 +624,6 @@ CGRAMLoop:
 ;---
 
 .proc LoadBG
-    .byte $42, $00  ; breakdance
     phx ; save x
     phd ; create frame pointer
     tsc
