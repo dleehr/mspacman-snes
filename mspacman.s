@@ -67,7 +67,7 @@ SCREEN_LEFT     = $00   ; left screen boundary = 0
 SCREEN_RIGHT    = $df   ; right screen boundary = 25
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
-STARTING_X      = $84
+STARTING_X      = $68
 STARTING_Y      = $83
 PLAYER_OFFSET   = $04
 
@@ -423,8 +423,6 @@ MoveCheckDone:
     ; Check joypad
 Joypad:
     lda JOY1A
-    cmp JOY1AW       ; temporary hack
-    beq GameLoop     ; just move one pixel at a time
     sta JOY1AW
 ;    lda JOY1B
 ;    sta JOY1BW
