@@ -186,8 +186,8 @@ Next steps:
 
 use a single 8x8 sprite with no offsets
 
-1. clear out tiles 2,3,4
-2. set tile 1 to just an empty block
+1. clear out tiles 2,3,4 DONE
+2. set tile 1 to just an empty block DONE
 3. set bg color to a grid box
 4. remove offset logic
 5. store x and y coordinates to a memory location for debugging
