@@ -61,9 +61,6 @@ JOY_DOWN = $04
 JOY_LEFT = $02
 JOY_RIGHT = $01
 
-PLAYER_OFFSET_TOP_LEFT = $04
-PLAYER_OFFSET_BOTTOM_RIGHT = $0C
-
 ; --- Game Constants
 ; Use these to check for collisions with screen boundaries
 SCREEN_LEFT     = $00   ; left screen boundary = 0
@@ -72,10 +69,6 @@ SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 STARTING_X      = $88
 STARTING_Y      = $87
-TOP_OFFSET      = $05
-BOTTOM_OFFSET   = $0C
-LEFT_OFFSET     = $04
-RIGHT_OFFSET    = $0B
 
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
