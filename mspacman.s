@@ -67,8 +67,9 @@ SCREEN_LEFT     = $00   ; left screen boundary = 0
 SCREEN_RIGHT    = $df   ; right screen boundary = 25
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
-STARTING_X      = $88
-STARTING_Y      = $87
+STARTING_X      = $84
+STARTING_Y      = $83
+PLAYER_OFFSET   = $04
 
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
@@ -270,11 +271,15 @@ OAMLoop:
     Direction    = $0B      ; Direction bits from joystick
     OFFSET = $07
 ProcessDirection:
-    ; Even in my temporary no-offset debugging, the y coordinate is still off by one
-    ; so correct for that
+    ; The top line of the SNES gets dropped so Y position needs to be of by one to correct
     lda YPosition
-    inc
+    clc
+    adc #(PLAYER_OFFSET + 1)
     sta YPosition
+    lda XPosition
+    clc
+    adc #PLAYER_OFFSET
+    sta XPosition
 CheckUp:
     lda Direction
     and #JOY_UP
