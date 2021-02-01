@@ -179,3 +179,17 @@ One way to describe it - Should only allow TURNS when aligned to a pixel grid
 
 Other way to describe it - and my previous idea - both covered tiles (top left and bottom right)
 need to be zero
+
+This is going nowhere.
+
+Next steps:
+
+use a single 8x8 sprite with no offsets
+
+1. clear out tiles 2,3,4
+2. set tile 1 to just an empty block
+3. set bg color to a grid box
+4. remove offset logic
+5. store x and y coordinates to a memory location for debugging
+6. also store tile coordinates or return them
+7. debug that.

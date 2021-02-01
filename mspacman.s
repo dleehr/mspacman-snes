@@ -270,8 +270,22 @@ OAMLoop:
     YPosition    = $09      ; Y position of 16x16 character sprite
     XPosition    = $0A      ; X position of 16x16 character sprite
     Direction    = $0B      ; Direction bits from joystick
-    ; process direction to determine coordinate of top-left edge
+    ; process direction to determine coordinate of leading edge
+    ; TODO: need a second pair of bytes for the second edge
+    ; Either assign a static memory address or create a local, stack-relative place
+    ; Trying this
+    YPosition2   = $0C      ; just assigned these. does it crash?
+    XPosition2   = $0D
 ProcessDirection:
+    ; first correct for sprite offset
+    lda XPosition           ;
+    clc
+    adc #$05                ; just correct for
+    sta XPosition           ; sprite offset
+    lda YPosition
+    clc
+    adc #$05
+    sta YPosition
 CheckUp:
     lda Direction
     and #JOY_UP
@@ -280,6 +294,11 @@ CheckUp:
     lda YPosition           ; moving UP, start with sprite Y position.
     dec
     sta YPosition
+    sta YPosition2
+    lda XPosition
+    clc
+    adc #$07
+    sta XPosition2
     jmp ComputeTopLeft
 CheckDown:
     lda Direction
@@ -289,6 +308,11 @@ CheckDown:
     lda YPosition           ; moving DOWN. start with sprite Y position.
     inc
     sta YPosition
+    sta YPosition2
+    lda XPosition
+    clc
+    adc #$07
+    sta XPosition2
     jmp ComputeTopLeft
 CheckLeft:
     lda Direction
@@ -298,8 +322,14 @@ CheckLeft:
     lda XPosition        ; moving LEFT. start with sprite X position.
     dec
     sta XPosition
+    sta XPosition2
+    lda YPosition
+    clc
+    adc #$07
+    sta YPosition2
     jmp ComputeTopLeft
 CheckRight:
+     .byte $42, $00          ; breakdance
     lda Direction
     and #JOY_RIGHT        ; Check left
     beq ComputeTopLeft       ; Right not pressed, done checking
@@ -307,18 +337,17 @@ CheckRight:
     lda XPosition        ; moving RIGHT
     inc
     sta XPosition
+    sta XPosition2
+    lda YPosition
+    clc
+    adc #$07
+    sta YPosition2
     jmp ComputeTopLeft
 ComputeTopLeft:
     tsx
-    lda XPosition           ;
-    clc
-    adc #$05                ; just correct for
-    sta XPosition           ; sprite offset
-    pha                     ; Push X position
+    lda XPosition
+    pha
     lda YPosition
-    clc
-    adc #$05
-    sta YPosition
     pha                     ; Push Y Position
     lda TileTL
     pha                     ; Push Tile Top Left
@@ -327,15 +356,9 @@ ComputeTopLeft:
     sta TileTL              ; save this as top-left tile
     txs                     ; restore stack pointer
 ComputeBottomRight:
-    lda XPosition
-    clc
-    adc #$07                ; X position was already inset. Get the last pixel in this block
-    sta XPosition
+    lda XPosition2
     pha
-    lda YPosition
-    clc
-    adc #$07
-    sta YPosition
+    lda YPosition2
     pha
     lda TileBR
     pha
