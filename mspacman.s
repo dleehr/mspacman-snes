@@ -448,12 +448,15 @@ HandleActiveJoypadInput:
     pha                     ; tile 2 return value
     jsr GetTargetBGTiles
     pla
+    ; Check if tile empty
     sta BG_TILE1
     pla
     sta BG_TILE2
     txs                     ; restore stack pointer to before the call
     ; Check if it is a background tile - 00
-    ; bne CheckDirection      ; The joypad attempted to move us into a wall, so ignore it and try to process existing movement
+    bne CheckDirection      ; The joypad attempted to move us into a wall, so ignore it and try to process existing movement
+    lda BG_TILE1
+    bne CheckDirection
     ; at this point, joypad movement is good!
     lda JOY1AW              ; store existing joypad movement ...
     sta PLAYER_DIRECTION    ; ... into PLAYER_DIRECTION
