@@ -461,9 +461,28 @@ HandleActiveJoypadInput:
     lda JOY1AW              ; store existing joypad movement ...
     sta PLAYER_DIRECTION    ; ... into PLAYER_DIRECTION
     jsr MovePlayer          ; move the player according to PLAYER_DIRECTION
-CheckDirection:
-    ; TODO: Check if existing direction collides with a wall
     jmp FinishMovePlayer
+CheckDirection:
+    tsx         ; save current stack pointer
+    lda PLAYER_DIRECTION ; load last good direction
+    pha
+    lda OAMMIRROR       ; current X position
+    pha
+    lda OAMMIRROR + $01 ; current Y position
+    pha
+    pea $0000           ; 2 bytes for target tiles
+    jsr GetTargetBGTiles
+    pla                 ; tile 1
+    sta BG_TILE1
+    pla
+    sta BG_TILE2
+    txs         ; restore stack pointer
+    ; Check if background tile
+    bne FinishMovePlayer
+    lda BG_TILE1
+    bne FinishMovePlayer
+    ; at this point, existing movement is good
+    jsr MovePlayer
 FinishMovePlayer:
     jmp GameLoop
 .endproc
