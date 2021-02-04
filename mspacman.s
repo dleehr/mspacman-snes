@@ -12,6 +12,8 @@ BG3TMADD    = $2109     ; BG3 tile map location
 BG4TMADD    = $210A     ; BG4 tile map location
 BG12CADD    = $210B     ; BG1, BG2 Character location
 BG34CADD    = $210C     ; BG3, BG4 Character location
+BG1HSCROLL  = $210D     ; BG1 Horizontal Scroll
+BG1VSCROLL  = $210E     ; BG1 Vertical Scroll
 VMAINC      = $2115     ; VRAM Address increment value designation
 VMADDL      = $2116     ; address (Low) for VRAM write
 VMADDH      = $2117     ; high
@@ -36,8 +38,8 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; ---
 
 ; --- Memory Map WRAM (just the layout of memory locations)
-TARGET_X    = $0300     ; New x position for sprite when computing movement
-TARGET_Y    = $0301     ; New Y position for sprite when computing movement
+; SCROLL_X    = $0300     ; X offset of scrolling, not used
+SCROLL_Y    = $0301     ; Y Offset of scrolling
 BG_TILE1    = $0302     ; will be writing the current background tiles here
 BG_TILE2    = $0303     ;
 PLAYER_DIRECTION    = $0304 ; curent direction of player
@@ -70,7 +72,7 @@ SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 STARTING_X      = $68
 STARTING_Y      = $83
 PLAYER_OFFSET   = $04
-
+INITIAL_SCROLL_Y= $10
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
@@ -635,6 +637,12 @@ SetupBGLocations:
     sta BG1TMADD ; becomes $6000 in VRAM
     lda #$00     ; tiles starting location in vram...
     sta BG12CADD ; ...lower 4 bits are for BG1, becomes $0000 in VRAM
+LoadScrollOffset:
+    ; just vertical scrolling
+    lda #INITIAL_SCROLL_Y
+    sta SCROLL_Y
+    sta BG1VSCROLL  ; write low byte
+    stz BG1VSCROLL  ; write high byte
 LoadTileData:
     ; this happens in LoadVRAM
 LoadChrData:
