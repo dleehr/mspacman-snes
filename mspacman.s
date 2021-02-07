@@ -75,6 +75,9 @@ STARTING_X      = $68
 STARTING_Y      = $83
 PLAYER_OFFSET   = $04
 INITIAL_SCROLL_Y= $10
+END_ZONE_TOP    = $10
+END_ZONE_BOTTOM = $cf
+
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
@@ -446,7 +449,6 @@ Joypad:
     and #$0f           ; B, Select, Start, Up, Down, Left, Right
     beq CheckDirection ; no direction held, skip part 1
 HandleActiveJoypadInput:
-    .byte $42, $00          ; breakdance
     ; Joypad direction currently held. Try that movement first
     ; Get ready to call GetTargetCoordinate
     tsx     ; save current stack pointer before pushing things for subroutine
@@ -499,7 +501,24 @@ CheckDirection:
     ; at this point, existing movement is good
     jsr MovePlayer
 FinishMovePlayer:
+HandleScroll:
+    ; Check absolute position of missy (MISSY_Y)
+    ; if below the top end-zone, don't change scroll
+CheckEndZoneTop:
+    lda MISSY_Y
+    cmp #END_ZONE_TOP
+    bpl CheckEndZoneBottom      ; if we're above the top end zone, check the bottom
+    ; handle top end zone
+CheckEndZoneBottom:
+    cmp #END_ZONE_BOTTOM
+    bmi TranslatePlayerCoordinates  ; we're not yet in the bottom end zone
+    ; handle bottom end zone
+
+    ; if above the bottom end zone, don't change scroll
+    ; if between the end zones, update scroll offset
+
     ; Translate absolute position (MISSY_X, MISSY_Y) to relative coordinates
+TranslatePlayerCoordinates:
     lda SCROLL_Y
     eor #$ff
     clc
@@ -523,9 +542,9 @@ FinishMovePlayer:
         lda RDNMI           ; read NMI status, acknowledge NMI
 
         ; Update the scroll offset - does this need to happen during v-blank?
-;        lda SCROLL_Y
-;        sta BG1VSCROLL  ; write low byte
-;        stz BG1VSCROLL  ; write high byte
+        lda SCROLL_Y
+        sta BG1VSCROLL  ; write low byte
+        stz BG1VSCROLL  ; write high byte
 
         ; this is where we do graphics update
         tsx                 ; save old stack pointer
