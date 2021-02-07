@@ -49,6 +49,8 @@ TARGET_X2   = $0312
 TARGET_Y2   = $0313
 BG_TILE1T   = $0320     ; temp
 BG_TILE2T   = $0321     ; temp
+MISSY_X     = $0330     ; absolute X
+MISSY_Y     = $0331     ; absolute Y
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -164,10 +166,23 @@ Level1Map:          .incbin "level1.tlm"
     ldx #$00
     ; upper-left sprite, starts at halfway point
     lda #STARTING_X     ; starting X position for player
+    sta MISSY_X         ; store A into absolute X position
     sta OAMMIRROR, X    ; store A into OAMMIRROR memory location, offset by X (like c pointer arithmetic offset)
     inx                 ; increment index
-    lda #STARTING_Y     ; starting Y position for player
+    ; need to get INITIAL_SCROLL_Y somewhere we can add it, will put it on stack
+    clc
+    lda #INITIAL_SCROLL_Y
+    eor #$ff
+    clc
+    inc
+    pha                 ; push it to stack, we will add it here
+    lda #STARTING_Y     ; starting Y position for player (absolute)
+    sta MISSY_Y         ; store Y position into absolute Y coordinate
+    clc
+    adc $01, S          ; the negated initial scroll Y is on the stack
+                        ; To get the sprite position, need to subtract INITIAL_SCROLL_Y
     sta OAMMIRROR, X
+    pla                 ; pop the arg off the stack
     inx
     lda #$00            ; sprite 1, name is 00
     sta OAMMIRROR, X

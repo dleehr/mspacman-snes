@@ -49,4 +49,19 @@ This worked to scroll, but now missy is in the same absolute position but the ba
     Need to establish a set of absolute player coordinates that are used for collision detection
     but then for drawing on the screen, offset by the scroll offset and player insets
 
-Then when getting close to the top or bottom, change the offset?
+Then for handling scroll behavior, here are the rules from DP snes game
+
+1. If screen CAN move, move sreen & keep missy stationary
+2. if screen cannot move, move missy.
+3. But if she's in the end zone, don't scroll until crossing it
+
+But that game has a very tall map, and we only have to scroll to cover the edges
+
+End zone is the top 16 pixels and bottom 16 pixels
+
+So really just if the absolute Y coordinate is < 16 or > 240, move the character.
+if absolute Y is > 16 and < 240, move the screen
+
+but the screen should mostly fit, so that would be a lot of background scrolling
+
+bigger end zone?
