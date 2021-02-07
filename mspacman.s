@@ -506,17 +506,35 @@ HandleScroll:
     ; if below the top end-zone, don't change scroll
 CheckEndZoneTop:
     lda MISSY_Y
+    clc
     cmp #END_ZONE_TOP
-    bpl CheckEndZoneBottom      ; if we're above the top end zone, check the bottom
+    bcs CheckEndZoneBottom      ; if we're above the top end zone, check the bottom
+    .byte $42, $00          ; breakdance
     ; handle top end zone
+    ; TODO: compute the scroll offset - should be between $00 (0) and $10 (16)
+    lda MISSY_Y
+    sta SCROLL_Y
+    jmp TranslatePlayerCoordinates
 CheckEndZoneBottom:
+    clc
     cmp #END_ZONE_BOTTOM
-    bmi TranslatePlayerCoordinates  ; we're not yet in the bottom end zone
+    bcc HandleMiddleZone  ; we're not yet in the bottom end zone
+    .byte $42, $00          ; breakdance
     ; handle bottom end zone
-
+    ; compute the scroll offset
+    ; SCROLL_Y = MISSY_Y - $bf
+    lda MISSY_Y
+    clc
+    adc #$41     ; 2's complement of $bf - helps to use #$ (immediate) instead of $ (memory address)
+    ; TODO: Limit the scroll position
+    sta SCROLL_Y
+    jmp TranslatePlayerCoordinates
     ; if above the bottom end zone, don't change scroll
     ; if between the end zones, update scroll offset
-
+HandleMiddleZone:
+    ; In the middle zone, scroll offset should be Y
+    lda #INITIAL_SCROLL_Y
+    sta SCROLL_Y
     ; Translate absolute position (MISSY_X, MISSY_Y) to relative coordinates
 TranslatePlayerCoordinates:
     lda SCROLL_Y
