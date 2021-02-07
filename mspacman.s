@@ -399,33 +399,33 @@ MoveCheckUp:
     and #JOY_UP
     beq MoveCheckDown
     ; up was pressed....
-    lda OAMMIRROR + $01
+    lda MISSY_Y
     dec
-    sta OAMMIRROR + $01
+    sta MISSY_Y
     rts
 MoveCheckDown:
     lda PLAYER_DIRECTION
     and #JOY_DOWN
     beq MoveCheckLeft
-    lda OAMMIRROR + $01
+    lda MISSY_Y
     inc
-    sta OAMMIRROR + $01
+    sta MISSY_Y
     rts
 MoveCheckLeft:
     lda PLAYER_DIRECTION
     and #JOY_LEFT
     beq MoveCheckRight
-    lda OAMMIRROR
+    lda MISSY_X
     dec
-    sta OAMMIRROR
+    sta MISSY_X
     rts
 MoveCheckRight:
     lda PLAYER_DIRECTION
     and #JOY_RIGHT
     beq MoveCheckDone
-    lda OAMMIRROR
+    lda MISSY_X
     inc
-    sta OAMMIRROR
+    sta MISSY_X
 MoveCheckDone:
     rts
 .endproc
@@ -441,22 +441,20 @@ MoveCheckDone:
 Joypad:
     lda JOY1A
     sta JOY1AW
-;    lda JOY1B
-;    sta JOY1BW
-
     ; Check if any direction currently pressed
-    lda JOY1A
+;    lda JOY1AW         ; This is already in A, so can be skipped
     and #$0f           ; B, Select, Start, Up, Down, Left, Right
     beq CheckDirection ; no direction held, skip part 1
 HandleActiveJoypadInput:
+    .byte $42, $00          ; breakdance
     ; Joypad direction currently held. Try that movement first
     ; Get ready to call GetTargetCoordinate
     tsx     ; save current stack pointer before pushing things for subroutine
     lda JOY1AW
     pha     ; push the direction
-    lda OAMMIRROR           ; Get current X position
+    lda MISSY_X             ; Get current X position
     pha                     ; push it onto the stack before call
-    lda OAMMIRROR + $01     ; Get current Y Position
+    lda MISSY_Y             ; Get current Y Position
     pha                     ; push it onto the stack before call
     ; now I push 00 twice. Could do a pea $0000 instead but i'll leave it here for consistency
     lda #$00
@@ -483,9 +481,9 @@ CheckDirection:
     tsx         ; save current stack pointer
     lda PLAYER_DIRECTION ; load last good direction
     pha
-    lda OAMMIRROR       ; current X position
+    lda MISSY_X       ; current X position
     pha
-    lda OAMMIRROR + $01 ; current Y position
+    lda MISSY_Y       ; current Y position
     pha
     pea $0000           ; 2 bytes for target tiles
     jsr GetTargetBGTiles
@@ -501,6 +499,19 @@ CheckDirection:
     ; at this point, existing movement is good
     jsr MovePlayer
 FinishMovePlayer:
+    ; Translate absolute position (MISSY_X, MISSY_Y) to relative coordinates
+    lda SCROLL_Y
+    eor #$ff
+    clc
+    inc
+    pha                 ; push it to stack, we will add it here
+    lda MISSY_Y
+    clc
+    adc $01, S          ; the negated initial scroll Y is on the stack
+                        ; To get the sprite position, need to subtract INITIAL_SCROLL_Y
+    sta OAMMIRROR + $01 ; store the offset Y position into screen coordinates
+    lda MISSY_X
+    sta OAMMIRROR
     jmp GameLoop
 .endproc
 ; ---
@@ -510,6 +521,11 @@ FinishMovePlayer:
 ; ---
 .proc   NMIHandler
         lda RDNMI           ; read NMI status, acknowledge NMI
+
+        ; Update the scroll offset - does this need to happen during v-blank?
+;        lda SCROLL_Y
+;        sta BG1VSCROLL  ; write low byte
+;        stz BG1VSCROLL  ; write high byte
 
         ; this is where we do graphics update
         tsx                 ; save old stack pointer
