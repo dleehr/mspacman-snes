@@ -38,8 +38,9 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; ---
 
 ; --- Memory Map WRAM (just the layout of memory locations)
-; SCROLL_X    = $0300     ; X offset of scrolling, not used
+SCROLL_X    = $0300     ; X offset of scrolling, not used
 SCROLL_Y    = $0301     ; Y Offset of scrolling
+
 BG_TILE1    = $0302     ; will be writing the current background tiles here
 BG_TILE2    = $0303     ;
 PLAYER_DIRECTION    = $0304 ; curent direction of player
@@ -74,6 +75,7 @@ SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 STARTING_X      = $68
 STARTING_Y      = $83
 PLAYER_OFFSET   = $04
+INITIAL_SCROLL_X= $ef
 INITIAL_SCROLL_Y= $10
 END_ZONE_TOP    = $10
 END_ZONE_BOTTOM = $cf
@@ -168,9 +170,19 @@ Level1Map:          .incbin "level1.tlm"
     ; set up initial data in OAMRAM mirror, using X as index
     ldx #$00
     ; upper-left sprite, starts at halfway point
+    ; need to get INITIAL_SCROLL_X somewhere we can add it, will put it on stack
+    clc
+    lda #INITIAL_SCROLL_X
+    eor #$ff
+    clc
+    inc
+    pha                 ; push it to stack, we will add it here
     lda #STARTING_X     ; starting X position for player
     sta MISSY_X         ; store A into absolute X position
+    clc
+    adc $01, S
     sta OAMMIRROR, X    ; store A into OAMMIRROR memory location, offset by X (like c pointer arithmetic offset)
+    pla
     inx                 ; increment index
     ; need to get INITIAL_SCROLL_Y somewhere we can add it, will put it on stack
     clc
@@ -548,8 +560,17 @@ TranslatePlayerCoordinates:
     adc $01, S          ; the negated initial scroll Y is on the stack
                         ; To get the sprite position, need to subtract INITIAL_SCROLL_Y
     sta OAMMIRROR + $01 ; store the offset Y position into screen coordinates
+    pla
+    lda SCROLL_X
+    eor #$ff
+    clc
+    inc
+    pha
     lda MISSY_X
+    clc
+    adc $01, S
     sta OAMMIRROR
+    pla
     jmp GameLoop
 .endproc
 ; ---
@@ -712,6 +733,10 @@ LoadScrollOffset:
     sta SCROLL_Y
     sta BG1VSCROLL  ; write low byte
     stz BG1VSCROLL  ; write high byte
+    lda #INITIAL_SCROLL_X
+    sta SCROLL_X
+    sta BG1HSCROLL
+    stz BG1HSCROLL
 LoadTileData:
     ; this happens in LoadVRAM
 LoadChrData:
