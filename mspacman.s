@@ -507,19 +507,20 @@ HandleScroll:
 CheckEndZoneTop:
     lda MISSY_Y
     clc
-    cmp #END_ZONE_TOP
+    cmp #(END_ZONE_TOP + 6)
     bcs CheckEndZoneBottom      ; if we're above the top end zone, check the bottom
-    .byte $42, $00          ; breakdance
     ; handle top end zone
     ; TODO: compute the scroll offset - should be between $00 (0) and $10 (16)
     lda MISSY_Y
+    ; subtract ... 6?
+    clc
+    adc #$fa            ; -6 in 2's-c
     sta SCROLL_Y
     jmp TranslatePlayerCoordinates
 CheckEndZoneBottom:
     clc
     cmp #END_ZONE_BOTTOM
     bcc HandleMiddleZone  ; we're not yet in the bottom end zone
-    .byte $42, $00          ; breakdance
     ; handle bottom end zone
     ; compute the scroll offset
     ; SCROLL_Y = MISSY_Y - $bf
