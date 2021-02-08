@@ -1,0 +1,67 @@
+https://www.raphnet.net/divers/retro_challenge_2019_03/qsnesdoc.html
+
+egister $210D to $2114: Scroll Registers (Db/W)
+
+210D: BG1 Horizontal Scroll   210E: BG1 Vertical Scroll
+210F: BG2 Horizontal Scroll   2110: BG2 Vertical Scroll
+2111: BG3 Horizontal Scroll   2112: BG3 Vertical Scroll
+2113: BG4 Horizontal Scroll   2114: BG4 Vertical Scroll
+
+mmmmmaaa aaaaaaaa  a: Horizontal/Vertical offset m: Mode 7 only
+
+This register must be written twice to write the complete value; every
+time the register is written to, an internal pointer alternates between
+changing the high and low bytes.  The first time you write to the
+register, the low byte will be changed.  There are 11 bits for the
+offset; when these bits are set to 0, you will see tile map location 0
+on the left/top of the screen.  The offset is a pixel value, so adding
+one will scroll the screen right by one pixel.  When the screen is
+scrolled right (or down) from 0, the rightmost (or bottommost) elements
+of the tile map will come on from the left (top) of the screen. If a
+pixel value is placed in this register that is larger than the width of
+the BG, a modulus can be performed to determine what the actual pixel
+will be that is displayed.  For example, if the BG1 horizontal pixel
+value is set to 257, but the width of the BG is 256 pixels, the result
+will be the same as if it was set to 1.
+
+The m bits are used in Mode 7 only; I don't know what they are for.  The
+only thing I've determined is that the scroll register seems to cause
+pixel-based scrolling: that is, increasing this register by one will
+make the screen scroll a slight amount right or down.  (256/224 would be
+one screenful.)
+
+Since there is only one BG in Mode 7, the 'm' bits apply only to
+registers $210D and $210E.
+
+------
+
+TryScrollOffset:
+    ; just vertical scrolling, up to 32
+    lda #(32 - 1)
+    sta BG1VSCROLL  ; write low byte
+    stz BG1VSCROLL  ; write high byte
+
+This worked to scroll, but now missy is in the same absolute position but the background is offset
+
+1. Establish a memory location for scroll offset @done
+2. Initial offset is 16 ($10) @done
+3. when storing the OAMMIRROR +1 (y position) add the offset
+    Need to establish a set of absolute player coordinates that are used for collision detection
+    but then for drawing on the screen, offset by the scroll offset and player insets
+
+Then for handling scroll behavior, here are the rules from DP snes game
+
+1. If screen CAN move, move sreen & keep missy stationary
+2. if screen cannot move, move missy.
+3. But if she's in the end zone, don't scroll until crossing it
+
+But that game has a very tall map, and we only have to scroll to cover the edges
+
+End zone is the top 16 pixels and bottom 16 pixels
+
+So really just if the absolute Y coordinate is < 16 or > 240, move the character.
+if absolute Y is > 16 and < 240, move the screen
+
+but the screen should mostly fit, so that would be a lot of background scrolling
+
+bigger end zone?

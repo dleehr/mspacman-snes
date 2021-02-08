@@ -12,6 +12,8 @@ BG3TMADD    = $2109     ; BG3 tile map location
 BG4TMADD    = $210A     ; BG4 tile map location
 BG12CADD    = $210B     ; BG1, BG2 Character location
 BG34CADD    = $210C     ; BG3, BG4 Character location
+BG1HSCROLL  = $210D     ; BG1 Horizontal Scroll
+BG1VSCROLL  = $210E     ; BG1 Vertical Scroll
 VMAINC      = $2115     ; VRAM Address increment value designation
 VMADDL      = $2116     ; address (Low) for VRAM write
 VMADDH      = $2117     ; high
@@ -36,8 +38,9 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; ---
 
 ; --- Memory Map WRAM (just the layout of memory locations)
-TARGET_X    = $0300     ; New x position for sprite when computing movement
-TARGET_Y    = $0301     ; New Y position for sprite when computing movement
+SCROLL_X    = $0300     ; X offset of scrolling, not used
+SCROLL_Y    = $0301     ; Y Offset of scrolling
+
 BG_TILE1    = $0302     ; will be writing the current background tiles here
 BG_TILE2    = $0303     ;
 PLAYER_DIRECTION    = $0304 ; curent direction of player
@@ -47,6 +50,8 @@ TARGET_X2   = $0312
 TARGET_Y2   = $0313
 BG_TILE1T   = $0320     ; temp
 BG_TILE2T   = $0321     ; temp
+MISSY_X     = $0330     ; absolute X
+MISSY_Y     = $0331     ; absolute Y
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -70,6 +75,10 @@ SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 STARTING_X      = $68
 STARTING_Y      = $83
 PLAYER_OFFSET   = $04
+INITIAL_SCROLL_X= $ef
+INITIAL_SCROLL_Y= $10
+END_ZONE_TOP    = $10
+END_ZONE_BOTTOM = $cf
 
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
@@ -161,11 +170,34 @@ Level1Map:          .incbin "level1.tlm"
     ; set up initial data in OAMRAM mirror, using X as index
     ldx #$00
     ; upper-left sprite, starts at halfway point
+    ; need to get INITIAL_SCROLL_X somewhere we can add it, will put it on stack
+    clc
+    lda #INITIAL_SCROLL_X
+    eor #$ff
+    clc
+    inc
+    pha                 ; push it to stack, we will add it here
     lda #STARTING_X     ; starting X position for player
+    sta MISSY_X         ; store A into absolute X position
+    clc
+    adc $01, S
     sta OAMMIRROR, X    ; store A into OAMMIRROR memory location, offset by X (like c pointer arithmetic offset)
+    pla
     inx                 ; increment index
-    lda #STARTING_Y     ; starting Y position for player
+    ; need to get INITIAL_SCROLL_Y somewhere we can add it, will put it on stack
+    clc
+    lda #INITIAL_SCROLL_Y
+    eor #$ff
+    clc
+    inc
+    pha                 ; push it to stack, we will add it here
+    lda #STARTING_Y     ; starting Y position for player (absolute)
+    sta MISSY_Y         ; store Y position into absolute Y coordinate
+    clc
+    adc $01, S          ; the negated initial scroll Y is on the stack
+                        ; To get the sprite position, need to subtract INITIAL_SCROLL_Y
     sta OAMMIRROR, X
+    pla                 ; pop the arg off the stack
     inx
     lda #$00            ; sprite 1, name is 00
     sta OAMMIRROR, X
@@ -382,33 +414,33 @@ MoveCheckUp:
     and #JOY_UP
     beq MoveCheckDown
     ; up was pressed....
-    lda OAMMIRROR + $01
+    lda MISSY_Y
     dec
-    sta OAMMIRROR + $01
+    sta MISSY_Y
     rts
 MoveCheckDown:
     lda PLAYER_DIRECTION
     and #JOY_DOWN
     beq MoveCheckLeft
-    lda OAMMIRROR + $01
+    lda MISSY_Y
     inc
-    sta OAMMIRROR + $01
+    sta MISSY_Y
     rts
 MoveCheckLeft:
     lda PLAYER_DIRECTION
     and #JOY_LEFT
     beq MoveCheckRight
-    lda OAMMIRROR
+    lda MISSY_X
     dec
-    sta OAMMIRROR
+    sta MISSY_X
     rts
 MoveCheckRight:
     lda PLAYER_DIRECTION
     and #JOY_RIGHT
     beq MoveCheckDone
-    lda OAMMIRROR
+    lda MISSY_X
     inc
-    sta OAMMIRROR
+    sta MISSY_X
 MoveCheckDone:
     rts
 .endproc
@@ -424,11 +456,8 @@ MoveCheckDone:
 Joypad:
     lda JOY1A
     sta JOY1AW
-;    lda JOY1B
-;    sta JOY1BW
-
     ; Check if any direction currently pressed
-    lda JOY1A
+;    lda JOY1AW         ; This is already in A, so can be skipped
     and #$0f           ; B, Select, Start, Up, Down, Left, Right
     beq CheckDirection ; no direction held, skip part 1
 HandleActiveJoypadInput:
@@ -437,9 +466,9 @@ HandleActiveJoypadInput:
     tsx     ; save current stack pointer before pushing things for subroutine
     lda JOY1AW
     pha     ; push the direction
-    lda OAMMIRROR           ; Get current X position
+    lda MISSY_X             ; Get current X position
     pha                     ; push it onto the stack before call
-    lda OAMMIRROR + $01     ; Get current Y Position
+    lda MISSY_Y             ; Get current Y Position
     pha                     ; push it onto the stack before call
     ; now I push 00 twice. Could do a pea $0000 instead but i'll leave it here for consistency
     lda #$00
@@ -466,9 +495,9 @@ CheckDirection:
     tsx         ; save current stack pointer
     lda PLAYER_DIRECTION ; load last good direction
     pha
-    lda OAMMIRROR       ; current X position
+    lda MISSY_X       ; current X position
     pha
-    lda OAMMIRROR + $01 ; current Y position
+    lda MISSY_Y       ; current Y position
     pha
     pea $0000           ; 2 bytes for target tiles
     jsr GetTargetBGTiles
@@ -484,6 +513,64 @@ CheckDirection:
     ; at this point, existing movement is good
     jsr MovePlayer
 FinishMovePlayer:
+HandleScroll:
+    ; Check absolute position of missy (MISSY_Y)
+    ; if below the top end-zone, don't change scroll
+CheckEndZoneTop:
+    lda MISSY_Y
+    clc
+    cmp #(END_ZONE_TOP + 6)
+    bcs CheckEndZoneBottom      ; if we're above the top end zone, check the bottom
+    ; handle top end zone
+    ; TODO: compute the scroll offset - should be between $00 (0) and $10 (16)
+    lda MISSY_Y
+    ; subtract ... 6?
+    clc
+    adc #$fa            ; -6 in 2's-c
+    sta SCROLL_Y
+    jmp TranslatePlayerCoordinates
+CheckEndZoneBottom:
+    clc
+    cmp #END_ZONE_BOTTOM
+    bcc HandleMiddleZone  ; we're not yet in the bottom end zone
+    ; handle bottom end zone
+    ; compute the scroll offset
+    ; SCROLL_Y = MISSY_Y - $bf
+    lda MISSY_Y
+    clc
+    adc #$41     ; 2's complement of $bf - helps to use #$ (immediate) instead of $ (memory address)
+    ; TODO: Limit the scroll position
+    sta SCROLL_Y
+    jmp TranslatePlayerCoordinates
+    ; if above the bottom end zone, don't change scroll
+    ; if between the end zones, update scroll offset
+HandleMiddleZone:
+    ; In the middle zone, scroll offset should be Y
+    lda #INITIAL_SCROLL_Y
+    sta SCROLL_Y
+    ; Translate absolute position (MISSY_X, MISSY_Y) to relative coordinates
+TranslatePlayerCoordinates:
+    lda SCROLL_Y
+    eor #$ff
+    clc
+    inc
+    pha                 ; push it to stack, we will add it here
+    lda MISSY_Y
+    clc
+    adc $01, S          ; the negated initial scroll Y is on the stack
+                        ; To get the sprite position, need to subtract INITIAL_SCROLL_Y
+    sta OAMMIRROR + $01 ; store the offset Y position into screen coordinates
+    pla
+    lda SCROLL_X
+    eor #$ff
+    clc
+    inc
+    pha
+    lda MISSY_X
+    clc
+    adc $01, S
+    sta OAMMIRROR
+    pla
     jmp GameLoop
 .endproc
 ; ---
@@ -493,6 +580,11 @@ FinishMovePlayer:
 ; ---
 .proc   NMIHandler
         lda RDNMI           ; read NMI status, acknowledge NMI
+
+        ; Update the scroll offset - does this need to happen during v-blank?
+        lda SCROLL_Y
+        sta BG1VSCROLL  ; write low byte
+        stz BG1VSCROLL  ; write high byte
 
         ; this is where we do graphics update
         tsx                 ; save old stack pointer
@@ -635,6 +727,16 @@ SetupBGLocations:
     sta BG1TMADD ; becomes $6000 in VRAM
     lda #$00     ; tiles starting location in vram...
     sta BG12CADD ; ...lower 4 bits are for BG1, becomes $0000 in VRAM
+LoadScrollOffset:
+    ; just vertical scrolling
+    lda #INITIAL_SCROLL_Y
+    sta SCROLL_Y
+    sta BG1VSCROLL  ; write low byte
+    stz BG1VSCROLL  ; write high byte
+    lda #INITIAL_SCROLL_X
+    sta SCROLL_X
+    sta BG1HSCROLL
+    stz BG1HSCROLL
 LoadTileData:
     ; this happens in LoadVRAM
 LoadChrData:
