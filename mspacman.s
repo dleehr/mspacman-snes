@@ -80,6 +80,11 @@ INITIAL_SCROLL_Y= $10
 END_ZONE_TOP    = $10
 END_ZONE_BOTTOM = $cf
 
+; Walkable tiles
+TILE_BLANK      = $00
+TILE_DOT        = $10
+TILE_POWER      = $11
+
 ; simple constant to define sprite movement speed
 SPRITE_SPEED    = $00   ; initial speed is stopped
 ; makes the code a bit more readable
