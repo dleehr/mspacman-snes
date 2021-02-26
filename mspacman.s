@@ -73,7 +73,7 @@ SCREEN_RIGHT    = $df   ; right screen boundary = 25
 SCREEN_TOP      = $00   ; top screen boundary = 0
 SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 STARTING_X      = $68
-STARTING_Y      = $83
+STARTING_Y      = $B3
 PLAYER_OFFSET   = $04
 INITIAL_SCROLL_X= $ef
 INITIAL_SCROLL_Y= $10
