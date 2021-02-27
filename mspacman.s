@@ -159,7 +159,7 @@ Level1Map:          .incbin "level1.tlm"
     tsx
     pea $0000       ; push VRAM destination address - start where the old one left off
     pea WallData    ; wall tiles source address
-    pea $0300       ; count of bytes to transfer
+    pea $0400       ; count of bytes to transfer
     jsr LoadVRAM    ; transfer data in subroutine
     txs             ; "delete" data on stack by restoring old stack pointer
 
@@ -447,6 +447,16 @@ MoveCheckRight:
     inc
     sta MISSY_X
 MoveCheckDone:
+    rts
+.endproc
+
+; Given tiles, return if move can happen
+; 0 = no move
+; 1 = 1 point
+;
+.proc CheckMoveTiles
+    ; might be better to put all the movable tiles in the 00 range, and then put the wall tiles in the 10 range
+    ; that way I can just check the first digit
     rts
 .endproc
 
