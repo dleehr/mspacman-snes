@@ -450,16 +450,46 @@ MoveCheckDone:
     rts
 .endproc
 
-; Given tiles, return if move can happen
-; 0 = no move
-; 1 = 1 point
-;
-.proc CheckMoveTiles
-    ; might be better to put all the movable tiles in the 00 range, and then put the wall tiles in the 10 range
-    ; that way I can just check the first digit
-    rts
-.endproc
+; Direction, XPosition, YPosition (inout)
+; Tile 1 id, Tile 2 id, CanMove (return)
+; Check if both tiles are wokkable
+; return 1 if wokkable, 0 if not.
+; Might do static scoring in here too eventually. That's a hack but can get it done
+; Can't just do top-left and bottom right. Edges need to be based on movement direction
+.proc CheckWokkable
+    ; initial subroutine setup
+    phx                     ; save old stack pointer
+    ; create a frame pointer
+    phd                     ; push direct register to stack
+    tsc                     ; transfer stack to ...
+    tcd                     ; direct register
 
+    ; constants to access args on stack with direct addressing
+    CanMove      = $07      ; return value
+    Tile2        = $08      ; Tile 2
+    Tile1        = $09      ; Tile 1
+CheckTile1Wokkable:
+    lda Tile1       ; Check the top 4 bits of tile 1
+    and #$f0
+    bne NotWokkable
+CheckTile2Wokkable:
+    lda Tile2       ; Check the top 4 bits of tile 2
+    and #$f0
+    bne NotWokkable
+Wokkable:
+    lda #$01
+    sta CanMove
+    jmp FinishCheckWokkable
+NotWokkable:
+    ; If non-zero, this is a wall, no move
+    ; tile was non-zero. this is a wall, don't move
+    stz CanMove
+    ; all done
+FinishCheckWokkable:
+    pld                     ; pull back direct register
+    plx                     ; restore old stack pointer into x
+    rts                     ; return to caller
+.endproc
 
 ; ---
 ; after reset handler will jump to here
