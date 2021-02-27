@@ -527,10 +527,18 @@ HandleActiveJoypadInput:
     pla
     sta BG_TILE2
     txs                     ; restore stack pointer to before the call
-    ; Check if it is a background tile - 00
-    bne CheckDirection      ; The joypad attempted to move us into a wall, so ignore it and try to process existing movement
+    ; Get ready to call CheckWokkable - need Tile1, Tile2, and a return value
+    ; This is very repetitious with the above cleanup, easy optimization later
+    tsx
     lda BG_TILE1
-    bne CheckDirection
+    pha
+    lda BG_TILE2
+    pha
+    lda #$00
+    pha
+    jsr CheckWokkable
+    pla                 ; now wokkable is in a. 01 = wokkable, 00 = not
+    beq CheckDirection      ; Joypad attempted to move us into a wall. ignore that action and try to process existing movement
     ; at this point, joypad movement is good!
     lda JOY1AW              ; store existing joypad movement ...
     sta PLAYER_DIRECTION    ; ... into PLAYER_DIRECTION
@@ -551,10 +559,19 @@ CheckDirection:
     pla
     sta BG_TILE2
     txs         ; restore stack pointer
-    ; Check if background tile
-    bne FinishMovePlayer
+
+    ; Get ready to call CheckWokkable - need Tile1, Tile2, and a return value
+    ; This is very repetitious with the above cleanup, easy optimization later
+    tsx
     lda BG_TILE1
-    bne FinishMovePlayer
+    pha
+    lda BG_TILE2
+    pha
+    lda #$00
+    pha
+    jsr CheckWokkable
+    pla                 ; now wokkable is in a. 01 = wokkable, 00 = not
+    beq FinishMovePlayer      ; Joypad attempted to move us into a wall. ignore that action and try to process existing movement
     ; at this point, existing movement is good
     jsr MovePlayer
 FinishMovePlayer:
