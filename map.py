@@ -15,7 +15,7 @@ def handle_tile(tile):
     # Group 3 is the tile
     # group 4 is h flip
     # group 5 is v lip
-    piece = int(vals.group(3))
+    piece = int(vals.group(3), base=16)
     repeat = int(vals.group(2) or 1)
     flips = vals.group(4)
     h_flip = 'H' in flips
