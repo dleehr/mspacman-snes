@@ -38,9 +38,9 @@ def handle_tile(tile):
     # convert the piece
     piece = convert(piece)
     if repeat > 1:
-        return '{}x{}{}'.format(repeat, piece, flips)
+        return '{}x{}{}'.format(repeat, hex(piece)[2:], flips)
     else:
-        return '{}{}'.format(piece, flips)
+        return '{}{}'.format(hex(piece)[2:], flips)
 
 def write(rows, filename):
     with open(filename, 'w') as f:
