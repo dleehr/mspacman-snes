@@ -280,8 +280,6 @@ OAMLoop:
 
     lda Level1Map, X
     ; A now has the lower byte of the background tile.
-    ; 00 means empty. lower bits on upper byte could be set but we don't use that many
-    sta Tile
     ; subroutine cleanup and return
 
     pld                     ; pull back direct register
@@ -544,6 +542,7 @@ HandleActiveJoypadInput:
     lda JOY1AW              ; store existing joypad movement ...
     sta PLAYER_DIRECTION    ; ... into PLAYER_DIRECTION
     jsr MovePlayer          ; move the player according to PLAYER_DIRECTION
+    ; at this point, player has been moved
     jmp FinishMovePlayer
 CheckDirection:
     tsx         ; save current stack pointer
@@ -576,6 +575,7 @@ CheckDirection:
     beq FinishMovePlayer      ; Joypad attempted to move us into a wall. ignore that action and try to process existing movement
     ; at this point, existing movement is good
     jsr MovePlayer
+    ; at this point, player has been moved
 FinishMovePlayer:
 HandleScroll:
     ; Check absolute position of missy (MISSY_Y)
