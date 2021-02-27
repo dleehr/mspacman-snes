@@ -538,6 +538,7 @@ HandleActiveJoypadInput:
     pha
     jsr CheckWokkable
     pla                 ; now wokkable is in a. 01 = wokkable, 00 = not
+    txs         ; restore stack pointer
     beq CheckDirection      ; Joypad attempted to move us into a wall. ignore that action and try to process existing movement
     ; at this point, joypad movement is good!
     lda JOY1AW              ; store existing joypad movement ...
@@ -571,6 +572,7 @@ CheckDirection:
     pha
     jsr CheckWokkable
     pla                 ; now wokkable is in a. 01 = wokkable, 00 = not
+    txs         ; restore stack pointer
     beq FinishMovePlayer      ; Joypad attempted to move us into a wall. ignore that action and try to process existing movement
     ; at this point, existing movement is good
     jsr MovePlayer
