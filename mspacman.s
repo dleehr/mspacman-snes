@@ -280,6 +280,7 @@ OAMLoop:
 
     lda Level1Map, X
     ; A now has the lower byte of the background tile.
+    sta Tile
     ; subroutine cleanup and return
 
     pld                     ; pull back direct register
