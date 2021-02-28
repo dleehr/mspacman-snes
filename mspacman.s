@@ -455,6 +455,7 @@ MoveCheckDone:
 ; Might do static scoring in here too eventually. That's a hack but can get it done
 ; Can't just do top-left and bottom right. Edges need to be based on movement direction
 .proc CheckWokkable
+    .byte $42, $00
     ; initial subroutine setup
     phx                     ; save old stack pointer
     ; create a frame pointer
