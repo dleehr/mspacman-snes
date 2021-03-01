@@ -48,8 +48,6 @@ TARGET_X1   = $0310
 TARGET_Y1   = $0311
 TARGET_X2   = $0312
 TARGET_Y2   = $0313
-BG_TILE1T   = $0320     ; temp
-BG_TILE2T   = $0321     ; temp
 MISSY_X     = $0330     ; absolute X
 MISSY_Y     = $0331     ; absolute Y
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
@@ -389,7 +387,6 @@ ComputeTile1:
     jsr GetBGTile           ;
     pla                     ; Pull calculated tile out
     sta TileTL              ; save this as top-left tile
-    sta BG_TILE1T
     txs                     ; restore stack pointer
 ComputeTile2:
     tsx
@@ -402,7 +399,6 @@ ComputeTile2:
     jsr GetBGTile
     pla
     sta TileBR
-    sta BG_TILE2T
     txs
     ; subroutine cleanup and return
 ReturnFromGetTargetBGTile:
