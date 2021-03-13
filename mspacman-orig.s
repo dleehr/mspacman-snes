@@ -43,7 +43,6 @@ SCROLL_Y    = $0301     ; Y Offset of scrolling
 
 BG_TILE1    = $0302     ; will be writing the current background tiles here
 BG_TILE2    = $0303     ;
-; Can this go away?
 PLAYER_DIRECTION    = $0304 ; curent direction of player
 TARGET_X1   = $0310
 TARGET_Y1   = $0311
@@ -55,12 +54,9 @@ OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
 ; --- Joypad memory locations
-JOY1DIR      = $0700     ; Active Joypad 1 Up, Down, Left, Right
-MOM1DIR      = $0701     ; Momentum 1 Up, Down, Left, Right
+JOY1AW      = $0700     ;B, Select, Start, Up, Down, Left, Right
+JOY1BW      = $0701     ;A, X, L, R, iiii-ID
 
-; -- Player coordinates
-PLAYER1_X     = $0702     ; absolute X
-PLAYER1_Y     = $0703     ; absolute Y
 
 ; ---- Joypad bits
 JOY_UP = $08
@@ -77,13 +73,20 @@ SCREEN_BOTTOM   = $df   ; bottom screen boundary = 223
 STARTING_X      = $68
 STARTING_Y      = $B3
 PLAYER_OFFSET   = $04
-
-; --- Scrolling-related
 INITIAL_SCROLL_X= $ef
 INITIAL_SCROLL_Y= $10
 END_ZONE_TOP    = $10
 END_ZONE_BOTTOM = $cf
 
+; Walkable tiles
+TILE_BLANK      = $00
+TILE_DOT        = $10
+TILE_POWER      = $11
+
+; simple constant to define sprite movement speed
+SPRITE_SPEED    = $00   ; initial speed is stopped
+; makes the code a bit more readable
+SPRITE_SIZE     = $10   ; sprites are 16x16
 OAMMIRROR_SIZE  = $0220 ; OAMRAM can hold 128 spites, 4 bytes each (oh right, this is just the object attributes - x, y, name, flip/prio/palette)
 ; ---
 
@@ -240,176 +243,6 @@ OAMLoop:
 .endproc
 ; ---
 
-; ---
-; after reset handler will jump to here
-; ---
-; .smart ; keep track of registers widths
-.proc GameLoop
-    wai              ; wait for NMI/V-Blank
-    jsr ReadJoypad1  ; read joypad1 bits into JOY1DIR (and A)
-    ; Check if anything pressed
-    beq NothingPressed
-    tsx
-    lda JOY1DIR       ; push active direction onto the stack
-    pha
-    lda PLAYER1_X     ; push x coordinate onto the stack
-    pha
-    lda PLAYER1_Y     ; push y coordinate onto the stack
-    pha
-    jsr HandlePlayerDirection ; updates MOM1DIR
-    txs
-    ; no way to avoid checking the tiles twice but having a subroutine does help with momentum
-    ; Nothing pressed
-NothingPressed:
-    ; Check Momentum
-    lda MOM1DIR
-    beq NoMomentum
-    tsx               ; prep for call to HandlePlayerDirection
-    lda MOM1DIR       ; push momentum direction onto the stack
-    pha
-    lda PLAYER1_X     ; push x coordinate onto the stack
-    pha
-    lda PLAYER1_Y     ; push y coordinate onto the stack
-    pha
-    jsr HandlePlayerDirection     ; A contains momentum
-    txs
-    jmp EndPlayer1Movement
-NoMomentum:
-    jmp EndPlayer1Movement
-
-EndPlayer1Movement:
-
-    jmp GameLoop
-.endproc
-; ---
-
-
-; ---
-; Load controller 1, store into JOY1DIR
-.proc ReadJoypad1
-    lda JOY1A       ; B, Select, Start, Up, Down, Left, Right
-    and #$0f        ; Only interested in direction
-    sta JOY1DIR
-    rts
-.endproc
-
-; ---
-; Read direction and x, y position
-; If a valid move, updates MOM1DIR
-; Sets BGTILE1 BGTILE2 (both bg tiles covered)
-; Sets TARGET[X|Y][1|2]
-; Needs to also set a BG TILE 1/2 index
-; Also needs to take direction as an input JOY1, MOM1, GHO1-4
-; But that can be future
-
-; Inputs: Direction
-.proc HandlePlayerDirection
-    phx                     ; save old stack pointer
-    ; create a frame pointer
-    phd                     ; push direct register to stack
-    tsc                     ; transfer stack to ...
-    tcd                     ; direct register
-
-    ; stack offsets for params
-    YPosition     = $07
-    XPosition     = $08
-    Direction     = $09
-
-CheckDirection:
-    ; Check each direction
-    ; compute target coordinate
-
-    ; -- constants for edge detection
-    CHAR_OFFSET  = $04   ; how much to add to player coordinate to figure top-left corner for edge detection
-    EDGE_OFFSET  = $07   ; how much to add to above offset coordinate when calculating other corners for edge detection
-    ; The top line of the SNES gets dropped so Y position
-    ; needs to be of by one to correct. This was put here
-    ; before I implemented scrolling so might work better there.
-    lda YPosition
-    clc
-    adc #(CHAR_OFFSET + 1)
-    sta YPosition
-    lda XPosition
-    clc
-    adc #CHAR_OFFSET
-    sta XPosition
-CheckUp:
-    lda Direction
-    and #JOY_UP
-    beq CheckDown
-    ; up was pressed....
-    lda YPosition           ; moving UP, start with sprite Y position.
-    dec                     ; just consider the top edge
-    sta TARGET_Y1
-    sta TARGET_Y2
-    lda XPosition
-    sta TARGET_X1
-    clc
-    adc #EDGE_OFFSET
-    sta TARGET_X2
-    jmp EndCheckDirection
-CheckDown:
-    lda Direction
-    and #JOY_DOWN
-    beq CheckLeft           ; Down not pressed either,
-    ; down pressed
-    lda YPosition           ; moving DOWN. start with sprite Y position.
-    clc
-    adc #(EDGE_OFFSET + 1)       ; have to consider the bottom edge
-    sta TARGET_Y1
-    sta TARGET_Y2
-    lda XPosition
-    sta TARGET_X1
-    clc
-    adc #EDGE_OFFSET
-    sta TARGET_X2
-    jmp EndCheckDirection
-CheckLeft:
-    lda Direction
-    and #JOY_LEFT        ; Check left
-    beq CheckRight  ; Left no pressed, check the last one
-    ; Left pressed
-    lda XPosition        ; moving LEFT. start with sprite X position.
-    dec                  ; just consider the left edge
-    sta TARGET_X1
-    sta TARGET_X2
-    lda YPosition
-    sta TARGET_Y1
-    clc
-    adc #EDGE_OFFSET
-    sta TARGET_Y2
-    jmp EndCheckDirection
-CheckRight:
-    lda Direction
-    and #JOY_RIGHT        ; Check left
-    beq EndCheckDirection       ; Right not pressed, done checking
-    ; Right pressed
-    lda XPosition        ; moving RIGHT
-    clc
-    adc #(EDGE_OFFSET + 1)    ; have to consider the right edge
-    sta TARGET_X1
-    sta TARGET_X2
-    lda YPosition
-    sta TARGET_Y1
-    clc
-    adc #EDGE_OFFSET
-    sta TARGET_Y2
-EndCheckDirection:
-    ; At this point, TARGET_[X|Y][1|2] should be current
-    ; compute target tile locations
-
-
-    ; cleanup and return
-    pld                     ; pull back direct register
-    plx                     ; restore old stack pointer into x
-    rts                     ; return to caller
-.endproc
-
-
-
-; 2021-03-13 old code below here
-
-
 .proc GetBGTile
     phx                     ; save old stack pointer
     ; create a frame pointer
@@ -458,6 +291,120 @@ EndCheckDirection:
 ; return the background tile that would be crossed
 ; Can't just do top-left and bottom right. Edges need to be based on movement direction
 .proc GetTargetBGTiles
+    ; initial subroutine setup
+    phx                     ; save old stack pointer
+    ; create a frame pointer
+    phd                     ; push direct register to stack
+    tsc                     ; transfer stack to ...
+    tcd                     ; direct register
+    ; constants to access args on stack with direct addressing
+    TileTL       = $07      ; return value
+    TileBR       = $08      ; return value
+    YPosition    = $09      ; Y position of 16x16 character sprite
+    XPosition    = $0A      ; X position of 16x16 character sprite
+    Direction    = $0B      ; Direction bits from joystick
+    OFFSET = $07
+ProcessDirection:
+    ; The top line of the SNES gets dropped so Y position needs to be of by one to correct
+    lda YPosition
+    clc
+    adc #(PLAYER_OFFSET + 1)
+    sta YPosition
+    lda XPosition
+    clc
+    adc #PLAYER_OFFSET
+    sta XPosition
+CheckUp:
+    lda Direction
+    and #JOY_UP
+    beq CheckDown
+    ; up was pressed....
+    lda YPosition           ; moving UP, start with sprite Y position.
+    dec                     ; just consider the top edge
+    sta TARGET_Y1
+    sta TARGET_Y2
+    lda XPosition
+    sta TARGET_X1
+    clc
+    adc #OFFSET
+    sta TARGET_X2
+    jmp ComputeTile1
+CheckDown:
+    lda Direction
+    and #JOY_DOWN
+    beq CheckLeft           ; Down not pressed either,
+    ; down pressed
+    lda YPosition           ; moving DOWN. start with sprite Y position.
+    clc
+    adc #(OFFSET + 1)       ; have to consider the bottom edge
+    sta TARGET_Y1
+    sta TARGET_Y2
+    lda XPosition
+    sta TARGET_X1
+    clc
+    adc #OFFSET
+    sta TARGET_X2
+    jmp ComputeTile1
+CheckLeft:
+    lda Direction
+    and #JOY_LEFT        ; Check left
+    beq CheckRight  ; Left no pressed, check the last one
+    ; Left pressed
+    lda XPosition        ; moving LEFT. start with sprite X position.
+    dec                  ; just consider the left edge
+    sta TARGET_X1
+    sta TARGET_X2
+    lda YPosition
+    sta TARGET_Y1
+    clc
+    adc #OFFSET
+    sta TARGET_Y2
+    jmp ComputeTile1
+CheckRight:
+    lda Direction
+    and #JOY_RIGHT        ; Check left
+    beq ComputeTile1       ; Right not pressed, done checking
+    ; Right pressed
+    lda XPosition        ; moving RIGHT
+    clc
+    adc #(OFFSET + 1)    ; have to consider the right edge
+    sta TARGET_X1
+    sta TARGET_X2
+    lda YPosition
+    sta TARGET_Y1
+    clc
+    adc #OFFSET
+    sta TARGET_Y2
+    jmp ComputeTile1
+ComputeTile1:
+    tsx
+    lda TARGET_X1
+    pha
+    lda TARGET_Y1
+    pha                     ; Push Y Position
+    lda #$00
+    pha                     ; Push Tile1
+    jsr GetBGTile           ;
+    pla                     ; Pull calculated tile out
+    sta TileTL              ; save this as top-left tile
+    txs                     ; restore stack pointer
+ComputeTile2:
+    tsx
+    lda TARGET_X2
+    pha
+    lda TARGET_Y2
+    pha
+    lda #$00
+    pha
+    jsr GetBGTile
+    pla
+    sta TileBR
+    txs
+    ; subroutine cleanup and return
+ReturnFromGetTargetBGTile:
+    ; all done
+    pld                     ; pull back direct register
+    plx                     ; restore old stack pointer into x
     rts                     ; return to caller
 .endproc
 
@@ -539,6 +486,156 @@ FinishCheckWokkable:
     plx                     ; restore old stack pointer into x
     rts                     ; return to caller
 .endproc
+
+; ---
+; after reset handler will jump to here
+; ---
+; .smart ; keep track of registers widths
+.proc GameLoop
+    wai              ; wait for NMI/V-Blank
+    ; Check joypad
+Joypad:
+    lda JOY1A
+    sta JOY1AW
+    ; Check if any direction currently pressed
+;    lda JOY1AW         ; This is already in A, so can be skipped
+    and #$0f           ; B, Select, Start, Up, Down, Left, Right
+    beq CheckDirection ; no direction held, skip part 1
+HandleActiveJoypadInput:
+    ; Joypad direction currently held. Try that movement first
+    ; Get ready to call GetTargetCoordinate
+    tsx     ; save current stack pointer before pushing things for subroutine
+    lda JOY1AW
+    pha     ; push the direction
+    lda MISSY_X             ; Get current X position
+    pha                     ; push it onto the stack before call
+    lda MISSY_Y             ; Get current Y Position
+    pha                     ; push it onto the stack before call
+    ; now I push 00 twice. Could do a pea $0000 instead but i'll leave it here for consistency
+    lda #$00
+    pha                     ; tile 1 return value
+    lda #$00
+    pha                     ; tile 2 return value
+    jsr GetTargetBGTiles
+    pla
+    ; Check if tile empty
+    sta BG_TILE1
+    pla
+    sta BG_TILE2
+    txs                     ; restore stack pointer to before the call
+    ; Get ready to call CheckWokkable - need Tile1, Tile2, and a return value
+    ; This is very repetitious with the above cleanup, easy optimization later
+    tsx
+    lda BG_TILE1
+    pha
+    lda BG_TILE2
+    pha
+    lda #$00
+    pha
+    jsr CheckWokkable
+    pla                 ; now wokkable is in a. 01 = wokkable, 00 = not
+    txs         ; restore stack pointer
+    beq CheckDirection      ; Joypad attempted to move us into a wall. ignore that action and try to process existing movement
+    ; at this point, joypad movement is good!
+    lda JOY1AW              ; store existing joypad movement ...
+    sta PLAYER_DIRECTION    ; ... into PLAYER_DIRECTION
+    jsr MovePlayer          ; move the player according to PLAYER_DIRECTION
+    ; at this point, player has been moved
+    jmp FinishMovePlayer
+CheckDirection:
+    tsx         ; save current stack pointer
+    lda PLAYER_DIRECTION ; load last good direction
+    pha
+    lda MISSY_X       ; current X position
+    pha
+    lda MISSY_Y       ; current Y position
+    pha
+    pea $0000           ; 2 bytes for target tiles
+    jsr GetTargetBGTiles
+    pla                 ; tile 1
+    sta BG_TILE1
+    pla
+    sta BG_TILE2
+    txs         ; restore stack pointer
+
+    ; Get ready to call CheckWokkable - need Tile1, Tile2, and a return value
+    ; This is very repetitious with the above cleanup, easy optimization later
+    tsx
+    lda BG_TILE1
+    pha
+    lda BG_TILE2
+    pha
+    lda #$00
+    pha
+    jsr CheckWokkable
+    pla                 ; now wokkable is in a. 01 = wokkable, 00 = not
+    txs         ; restore stack pointer
+    beq FinishMovePlayer      ; Joypad attempted to move us into a wall. ignore that action and try to process existing movement
+    ; at this point, existing movement is good
+    jsr MovePlayer
+    ; at this point, player has been moved
+FinishMovePlayer:
+HandleScroll:
+    ; Check absolute position of missy (MISSY_Y)
+    ; if below the top end-zone, don't change scroll
+CheckEndZoneTop:
+    lda MISSY_Y
+    clc
+    cmp #(END_ZONE_TOP + 6)
+    bcs CheckEndZoneBottom      ; if we're above the top end zone, check the bottom
+    ; handle top end zone
+    ; TODO: compute the scroll offset - should be between $00 (0) and $10 (16)
+    lda MISSY_Y
+    ; subtract ... 6?
+    clc
+    adc #$fa            ; -6 in 2's-c
+    sta SCROLL_Y
+    jmp TranslatePlayerCoordinates
+CheckEndZoneBottom:
+    clc
+    cmp #END_ZONE_BOTTOM
+    bcc HandleMiddleZone  ; we're not yet in the bottom end zone
+    ; handle bottom end zone
+    ; compute the scroll offset
+    ; SCROLL_Y = MISSY_Y - $bf
+    lda MISSY_Y
+    clc
+    adc #$41     ; 2's complement of $bf - helps to use #$ (immediate) instead of $ (memory address)
+    ; TODO: Limit the scroll position
+    sta SCROLL_Y
+    jmp TranslatePlayerCoordinates
+    ; if above the bottom end zone, don't change scroll
+    ; if between the end zones, update scroll offset
+HandleMiddleZone:
+    ; In the middle zone, scroll offset should be Y
+    lda #INITIAL_SCROLL_Y
+    sta SCROLL_Y
+    ; Translate absolute position (MISSY_X, MISSY_Y) to relative coordinates
+TranslatePlayerCoordinates:
+    lda SCROLL_Y
+    eor #$ff
+    clc
+    inc
+    pha                 ; push it to stack, we will add it here
+    lda MISSY_Y
+    clc
+    adc $01, S          ; the negated initial scroll Y is on the stack
+                        ; To get the sprite position, need to subtract INITIAL_SCROLL_Y
+    sta OAMMIRROR + $01 ; store the offset Y position into screen coordinates
+    pla
+    lda SCROLL_X
+    eor #$ff
+    clc
+    inc
+    pha
+    lda MISSY_X
+    clc
+    adc $01, S
+    sta OAMMIRROR
+    pla
+    jmp GameLoop
+.endproc
+; ---
 
 ; ---
 ; called during v-blank every frame
