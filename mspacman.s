@@ -43,8 +43,6 @@ SCROLL_Y    = $0301     ; Y Offset of scrolling
 
 BG_TILE1    = $0302     ; will be writing the current background tiles here
 BG_TILE2    = $0303     ;
-; Can this go away?
-PLAYER_DIRECTION    = $0304 ; curent direction of player
 TARGET_X1   = $0310
 TARGET_Y1   = $0311
 TARGET_X2   = $0312
@@ -163,8 +161,18 @@ Level1Map:          .incbin "level1.tlm"
     jsr LoadBG
     txs
 
-;    lda #%00000001  ; set up OAM for sprite size andlocation of tiles - they start at $2000
-    lda #$01
+    ; clear other memory locations
+    stz MOM1DIR     ; this only gets copied from JOY1DIR when there is joypad input, must be initialized to 0
+    stz BG_TILE1
+    stz BG_TILE2
+    stz TARGET_X1
+    stz TARGET_Y1
+    stz TARGET_X2
+    stz TARGET_Y2
+    stz BG_TILE1_IDX
+    stz BG_TILE2_IDX
+
+    lda #$01         ; set up OAM for sprite size andlocation of tiles - they start at $2000
     sta OBJSEL       ; $2101 Object size $ object data area designation
 
     ; set up initial data in OAMRAM mirror, using X as index
