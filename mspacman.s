@@ -49,8 +49,8 @@ TARGET_X1   = $0310
 TARGET_Y1   = $0311
 TARGET_X2   = $0312
 TARGET_Y2   = $0313
-MISSY_X     = $0330     ; absolute X
-MISSY_Y     = $0331     ; absolute Y
+BG_TILE1_IDX= $0314     ; tile map index of x1/y1
+BG_TILE2_IDX= $0315     ; tile map index of x2/y2
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -178,7 +178,7 @@ Level1Map:          .incbin "level1.tlm"
     inc
     pha                 ; push it to stack, we will add it here
     lda #STARTING_X     ; starting X position for player
-    sta MISSY_X         ; store A into absolute X position
+    sta PLAYER1_Y       ; store A into absolute X position
     clc
     adc $01, S
     sta OAMMIRROR, X    ; store A into OAMMIRROR memory location, offset by X (like c pointer arithmetic offset)
@@ -192,7 +192,7 @@ Level1Map:          .incbin "level1.tlm"
     inc
     pha                 ; push it to stack, we will add it here
     lda #STARTING_Y     ; starting Y position for player (absolute)
-    sta MISSY_Y         ; store Y position into absolute Y coordinate
+    sta PLAYER1_Y       ; store Y position into absolute Y coordinate
     clc
     adc $01, S          ; the negated initial scroll Y is on the stack
                         ; To get the sprite position, need to subtract INITIAL_SCROLL_Y
@@ -249,6 +249,8 @@ OAMLoop:
     jsr ReadJoypad1  ; read joypad1 bits into JOY1DIR (and A)
     ; Check if anything pressed
     beq NothingPressed
+    ; something pressed, check that out
+    .byte $42, $00          ; breakpoint
     tsx
     lda JOY1DIR       ; push active direction onto the stack
     pha
@@ -309,7 +311,6 @@ EndPlayer1Movement:
     phd                     ; push direct register to stack
     tsc                     ; transfer stack to ...
     tcd                     ; direct register
-
     ; stack offsets for params
     YPosition     = $07
     XPosition     = $08
@@ -397,148 +398,77 @@ CheckRight:
 EndCheckDirection:
     ; At this point, TARGET_[X|Y][1|2] should be current
     ; compute target tile locations
+    ; have TARGET_X1 and Y1
+jmp EndHandlePlayerDirection
+    ; call GetBGTileIdx for X1/Y1
+    tsx
+    lda TARGET_Y1
+    pha
+    lda TARGET_X1
+    pha
+    lda #$00      ; blank byte for return value
+    pha
+    jsr GetBGTileIdx
+    ; pull a back and store it to BG_TILE1_IDX
+    pla
+    sta BG_TILE1_IDX
+    txs
 
+    ; call GetBGTileIdx  for X2/Y2
+    tsx
+    lda TARGET_Y2
+    pha
+    lda TARGET_X2
+    pha
+    lda #$00      ; blank byte for return value
+    pha
+    jsr GetBGTileIdx
+    ; pull a back and store it to BG_TILE2_IDX
+    pla
+    sta BG_TILE2_IDX
+    txs
 
+EndHandlePlayerDirection:
     ; cleanup and return
     pld                     ; pull back direct register
     plx                     ; restore old stack pointer into x
     rts                     ; return to caller
 .endproc
 
-
-
-; 2021-03-13 old code below here
-
-
-.proc GetBGTile
+.proc GetBGTileIdx
     phx                     ; save old stack pointer
     ; create a frame pointer
     phd                     ; push direct register to stack
     tsc                     ; transfer stack to ...
     tcd                     ; direct register
+
     ; constants to access args on stack with direct addressing
-    Tile         = $07      ; return value
+    TileIdx      = $07      ; return value
     YPosition    = $08      ; Y position of 16x16 character sprite
     XPosition    = $09      ; X position of 16x16 character sprite
 
     lda YPosition
-    rep #$20            ; set A to 16-bit
-    and #$00f8          ; Clear high bits because we only had 8 significant bits. Clear lower 3 because we're shifting those away
+    and #$f8                ; Clear lower 3 because we're shifting those away
     asl A
     asl A
     asl A
     pha                  ; push A
-    sep #$20        ; set A back to 8-bit since it comes from the stack
     lda XPosition        ; load x position into A
-    rep #$20            ; set A to 16-bit
-    and #$00f8
+    and #$f8
     lsr A                ; Divide
     lsr A                ; by 4 - because we divide y 8 and then double
     clc
     adc $01, S          ; add y index to x index
     ; now A has the offset of the tile
-    ; transfer it to x
-    tax
-    pla                 ; clear up stack
-    sep #$20        ; set A back to 8-bit
-    ; index into the tile map to get the tile
-
-    lda Level1Map, X
-    ; A now has the lower byte of the background tile.
-    sta Tile
+    sta TileIdx
+EndGetBGTileIdx:
     ; subroutine cleanup and return
-
     pld                     ; pull back direct register
     plx                     ; restore old stack pointer into x
     rts                     ; return to caller
 .endproc
 
-; Direction, XPosition, YPosition (inout)
-; based on an initial character position and a direction,
-; return the background tile that would be crossed
-; Can't just do top-left and bottom right. Edges need to be based on movement direction
-.proc GetTargetBGTiles
-    rts                     ; return to caller
-.endproc
-
-.proc MovePlayer
-MoveCheckUp:
-    lda PLAYER_DIRECTION
-    and #JOY_UP
-    beq MoveCheckDown
-    ; up was pressed....
-    lda MISSY_Y
-    dec
-    sta MISSY_Y
-    rts
-MoveCheckDown:
-    lda PLAYER_DIRECTION
-    and #JOY_DOWN
-    beq MoveCheckLeft
-    lda MISSY_Y
-    inc
-    sta MISSY_Y
-    rts
-MoveCheckLeft:
-    lda PLAYER_DIRECTION
-    and #JOY_LEFT
-    beq MoveCheckRight
-    lda MISSY_X
-    dec
-    sta MISSY_X
-    rts
-MoveCheckRight:
-    lda PLAYER_DIRECTION
-    and #JOY_RIGHT
-    beq MoveCheckDone
-    lda MISSY_X
-    inc
-    sta MISSY_X
-MoveCheckDone:
-    rts
-.endproc
-
-; Direction, XPosition, YPosition (inout)
-; Tile 1 id, Tile 2 id, CanMove (return)
-; Check if both tiles are wokkable
-; return 1 if wokkable, 0 if not.
-; Might do static scoring in here too eventually. That's a hack but can get it done
-; Can't just do top-left and bottom right. Edges need to be based on movement direction
-.proc CheckWokkable
-    .byte $42, $00
-    ; initial subroutine setup
-    phx                     ; save old stack pointer
-    ; create a frame pointer
-    phd                     ; push direct register to stack
-    tsc                     ; transfer stack to ...
-    tcd                     ; direct register
-
-    ; constants to access args on stack with direct addressing
-    CanMove      = $07      ; return value
-    Tile2        = $08      ; Tile 2
-    Tile1        = $09      ; Tile 1
-CheckTile1Wokkable:
-    lda Tile1       ; Check the top 4 bits of tile 1
-    and #$f0
-    bne NotWokkable
-CheckTile2Wokkable:
-    lda Tile2       ; Check the top 4 bits of tile 2
-    and #$f0
-    bne NotWokkable
-Wokkable:
-    lda #$01
-    sta CanMove
-    jmp FinishCheckWokkable
-NotWokkable:
-    ; If non-zero, this is a wall, no move
-    ; tile was non-zero. this is a wall, don't move
-    stz CanMove
-    ; all done
-FinishCheckWokkable:
-    pld                     ; pull back direct register
-    plx                     ; restore old stack pointer into x
-    rts                     ; return to caller
-.endproc
+; 2021-03-13 old code below here
 
 ; ---
 ; called during v-blank every frame
