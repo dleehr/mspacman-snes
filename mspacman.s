@@ -47,10 +47,11 @@ TARGET_X2   = $0304     ; x2 coordinate of where player will move
 TARGET_Y2   = $0305     ; y2 coordinate of where player will move
 BG_TILE1_IDX= $0306     ; tile map index of x1/y1
 BG_TILE2_IDX= $0307     ; tile map index of x2/y2
-BG_TILE1    = $0308     ; will be writing the current background tiles here
-BG_TILE2    = $0309     ;
-SCROLL_X    = $030A     ; X offset of scrolling, not used
-SCROLL_Y    = $030B     ; Y Offset of scrolling
+BG_IS_WALL  = $0308     ; 1 if either or both BG_TILE#_IDX points to a wall tile
+BG_TILE1    = $0309     ; will be writing the current background tiles here
+BG_TILE2    = $030A     ;
+SCROLL_X    = $0310     ; X offset of scrolling, not used
+SCROLL_Y    = $0311     ; Y Offset of scrolling
 
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
@@ -172,6 +173,7 @@ Level1Map:          .incbin "level1.tlm"
     stz TARGET_Y2
     stz BG_TILE1_IDX
     stz BG_TILE2_IDX
+    stz BG_IS_WALL
 
     lda #$01         ; set up OAM for sprite size andlocation of tiles - they start at $2000
     sta OBJSEL       ; $2101 Object size $ object data area designation
@@ -255,9 +257,11 @@ OAMLoop:
 ; .smart ; keep track of registers widths
 .proc GameLoop
     wai              ; wait for NMI/V-Blank
+BeginProcessPlayerDirection:
     jsr ReadJoypad1  ; read joypad1 bits into JOY1DIR (and A)
     ; Check if anything pressed
-    beq NothingPressed
+    beq ProcessPlayerMomentumDirection
+ProcessPlayerJoypadDirection:
     ; something pressed, check that out
     tsx
     lda JOY1DIR       ; push active direction onto the stack
@@ -266,14 +270,25 @@ OAMLoop:
     pha
     lda PLAYER1_Y     ; push y coordinate onto the stack
     pha
-    jsr HandlePlayerDirection ; updates MOM1DIR
+    jsr HandlePlayerDirection
     txs
     ; no way to avoid checking the tiles twice but having a subroutine does help with momentum
+    ; above subroutine sets HandlePlayerDirection based on JOY1DIR
+    ; TARGET_X1, TARGET_Y1, TARGET_X2, TARGET_Y2, BG_TILE1_IDX, BG_TILE2_IDX
+    ; Check BG_TILE1_IDX, BG_TILE2_IDX to see if they point to wall tiles
+    jsr CheckBGTilesAreWall
+    lda BG_IS_WALL
+    bne ProcessPlayerMomentumDirection  ; if non-zero, joypad movement headed player into a wall, ignore it
+CopyJoypadToMomentum:                   ; Joypad movement doesn't take player into a wall, copy it to momentum
+    lda JOY1DIR
+    sta MOM1DIR
+    jmp EndProcessPlayerDirection       ; Just set MOM1DIR and have checked movement. OK to move...
+    ; if so, update MOM1DIR and jump to move player
     ; Nothing pressed
-NothingPressed:
+ProcessPlayerMomentumDirection:
     ; Check Momentum
     lda MOM1DIR
-    beq NoMomentum
+    beq EndMovePlayer ; no momentum, don't bother moving or checking
     tsx               ; prep for call to HandlePlayerDirection
     lda MOM1DIR       ; push momentum direction onto the stack
     pha
@@ -283,15 +298,57 @@ NothingPressed:
     pha
     jsr HandlePlayerDirection     ; A contains momentum
     txs
-    jmp EndPlayer1Movement
-NoMomentum:
-    jmp EndPlayer1Movement
-
-EndPlayer1Movement:
-
+    jsr CheckBGTilesAreWall       ; Sets BG_IS_WALL based on momentum
+    lda BG_IS_WALL
+    beq BeginMovePlayer     ; momentum did not move us into a wall, handle movement
+StopPlayerMovement:
+    stz MOM1DIR
+    jmp EndMovePlayer
+EndProcessPlayerDirection:
+BeginMovePlayer:
+    ; Movement is good to go. read MOM1DIR and move player
+    ; read MOM1DIR and move player
+EndMovePlayer:
     jmp GameLoop
 .endproc
 ; ---
+
+; Check tiles at BG_TILE1_IDX and BG_TILE2_IDX to see if player can enter them
+; If yes, sets BG_IS_WALL = 0
+; If not, sets BG_IS_WALL = 1.
+
+; implementation here is pretty lazy
+; could instead slide up all those bits into one byte and just see if it's all zero
+
+.proc CheckBGTilesAreWall
+    .byte $42, $00
+    lda BG_TILE1_IDX
+    rep #$20            ; set A to 16-bit
+    and #$00ff          ; clear high bits
+    tax
+    sep #$20            ; set A back to 8-bit
+    lda Level1Map, X
+    ; now tile 1 is in a
+    and #$f0        ; Check the top 4 bits of tile 1
+    bne FoundWall   ; if any of the top 4 bits are set, that tile is a wall tile
+    ; at this point, top 4 bits of tile 1 are zeroes (otherwise 'bne FoundWall' would have been taken)
+    lda BG_TILE2_IDX
+    rep #$20            ; set A to 16-bit
+    and #$00ff          ; clear high bits
+    tax                 ; transfer to X because X is an index register used for offset from Level1Map
+    sep #$20        ; set A back to 8-bit
+    lda Level1Map, X
+    and #$f0        ; Check the top 4 bits of tile 1
+    bne FoundWall   ; if any of the top 4 bits are set, that tile is a wall tile
+    ; At this point, checked both BG_TILE#_IDX and found no wall
+    stz BG_IS_WALL
+    jmp EndCheckBGTilesAreWall
+FoundWall:
+    lda #$01
+    sta BG_IS_WALL
+EndCheckBGTilesAreWall:
+    rts
+.endproc
 
 
 ; ---
@@ -304,13 +361,9 @@ EndPlayer1Movement:
 .endproc
 
 ; ---
-; Read direction and x, y position
-; If a valid move, updates MOM1DIR
-; Sets BGTILE1 BGTILE2 (both bg tiles covered)
-; Sets TARGET[X|Y][1|2]
-; Needs to also set a BG TILE 1/2 index
-; Also needs to take direction as an input JOY1, MOM1, GHO1-4
-; But that can be future
+; Given X/Y position and direction (passed on stack)
+; Set globals TARGET_X1, TARGET_Y1, TARGET_X2, TARGET_Y2, BG_TILE1_IDX, BG_TILE2_IDX
+; (global, player-based locations)
 
 ; Inputs: Direction
 .proc HandlePlayerDirection
@@ -323,7 +376,6 @@ EndPlayer1Movement:
     YPosition     = $07
     XPosition     = $08
     Direction     = $09
-    .byte $42, $00
 CheckDirection:
     ; Check each direction
     ; compute target coordinate
@@ -434,6 +486,8 @@ EndCheckDirection:
     pla
     sta BG_TILE2_IDX
     txs
+
+    ; Now BG_TILE1_IDX and BG_TILE2_IDX are set
 
 EndHandlePlayerDirection:
     ; cleanup and return
