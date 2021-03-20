@@ -38,17 +38,20 @@ DAS0H       = $4306     ; DMA size register high, channel 0
 ; ---
 
 ; --- Memory Map WRAM (just the layout of memory locations)
-SCROLL_X    = $0300     ; X offset of scrolling, not used
-SCROLL_Y    = $0301     ; Y Offset of scrolling
 
-BG_TILE1    = $0302     ; will be writing the current background tiles here
-BG_TILE2    = $0303     ;
-TARGET_X1   = $0310
-TARGET_Y1   = $0311
-TARGET_X2   = $0312
-TARGET_Y2   = $0313
-BG_TILE1_IDX= $0314     ; tile map index of x1/y1
-BG_TILE2_IDX= $0315     ; tile map index of x2/y2
+PLAYER1_X   = $0300     ; absolute X
+PLAYER1_Y   = $0301     ; absolute Y
+TARGET_X1   = $0302     ; x1 coordinate of where player will move
+TARGET_Y1   = $0303     ; y1 coordinate of where player will move
+TARGET_X2   = $0304     ; x2 coordinate of where player will move
+TARGET_Y2   = $0305     ; y2 coordinate of where player will move
+BG_TILE1_IDX= $0306     ; tile map index of x1/y1
+BG_TILE2_IDX= $0307     ; tile map index of x2/y2
+BG_TILE1    = $0308     ; will be writing the current background tiles here
+BG_TILE2    = $0309     ;
+SCROLL_X    = $030A     ; X offset of scrolling, not used
+SCROLL_Y    = $030B     ; Y Offset of scrolling
+
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
 
@@ -57,8 +60,6 @@ JOY1DIR      = $0700     ; Active Joypad 1 Up, Down, Left, Right
 MOM1DIR      = $0701     ; Momentum 1 Up, Down, Left, Right
 
 ; -- Player coordinates
-PLAYER1_X     = $0702     ; absolute X
-PLAYER1_Y     = $0703     ; absolute Y
 
 ; ---- Joypad bits
 JOY_UP = $08
@@ -186,7 +187,7 @@ Level1Map:          .incbin "level1.tlm"
     inc
     pha                 ; push it to stack, we will add it here
     lda #STARTING_X     ; starting X position for player
-    sta PLAYER1_Y       ; store A into absolute X position
+    sta PLAYER1_X       ; store A into absolute X position
     clc
     adc $01, S
     sta OAMMIRROR, X    ; store A into OAMMIRROR memory location, offset by X (like c pointer arithmetic offset)
@@ -258,7 +259,6 @@ OAMLoop:
     ; Check if anything pressed
     beq NothingPressed
     ; something pressed, check that out
-    .byte $42, $00          ; breakpoint
     tsx
     lda JOY1DIR       ; push active direction onto the stack
     pha
@@ -323,7 +323,7 @@ EndPlayer1Movement:
     YPosition     = $07
     XPosition     = $08
     Direction     = $09
-
+    .byte $42, $00
 CheckDirection:
     ; Check each direction
     ; compute target coordinate
@@ -407,12 +407,11 @@ EndCheckDirection:
     ; At this point, TARGET_[X|Y][1|2] should be current
     ; compute target tile locations
     ; have TARGET_X1 and Y1
-jmp EndHandlePlayerDirection
     ; call GetBGTileIdx for X1/Y1
     tsx
-    lda TARGET_Y1
-    pha
     lda TARGET_X1
+    pha
+    lda TARGET_Y1
     pha
     lda #$00      ; blank byte for return value
     pha
@@ -424,9 +423,9 @@ jmp EndHandlePlayerDirection
 
     ; call GetBGTileIdx  for X2/Y2
     tsx
-    lda TARGET_Y2
-    pha
     lda TARGET_X2
+    pha
+    lda TARGET_Y2
     pha
     lda #$00      ; blank byte for return value
     pha
@@ -469,7 +468,8 @@ EndHandlePlayerDirection:
     adc $01, S          ; add y index to x index
     ; now A has the offset of the tile
     sta TileIdx
-EndGetBGTileIdx:
+    pla                 ; Pull off and discard pushed y-position so that stack is back on track, jack.
+
     ; subroutine cleanup and return
     pld                     ; pull back direct register
     plx                     ; restore old stack pointer into x
