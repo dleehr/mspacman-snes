@@ -45,13 +45,13 @@ TARGET_X1   = $0302     ; x1 coordinate of where player will move
 TARGET_Y1   = $0303     ; y1 coordinate of where player will move
 TARGET_X2   = $0304     ; x2 coordinate of where player will move
 TARGET_Y2   = $0305     ; y2 coordinate of where player will move
-BG_TILE1_IDX= $0306     ; tile map index of x1/y1
-BG_TILE2_IDX= $0307     ; tile map index of x2/y2
-BG_IS_WALL  = $0308     ; 1 if either or both BG_TILE#_IDX points to a wall tile
-BG_TILE1    = $0309     ; will be writing the current background tiles here
-BG_TILE2    = $030A     ;
-SCROLL_X    = $0310     ; X offset of scrolling, not used
-SCROLL_Y    = $0311     ; Y Offset of scrolling
+BG_TILE1_IDX= $0306     ; tile map index of x1/y1, 16-bit
+BG_TILE2_IDX= $0308     ; tile map index of x2/y2, 16-bit
+BG_IS_WALL  = $0309     ; 1 if either or both BG_TILE#_IDX points to a wall tile
+BG_TILE1    = $030A     ; will be writing the current background tiles here
+BG_TILE2    = $0310     ;
+SCROLL_X    = $0311     ; X offset of scrolling, not used
+SCROLL_Y    = $0312     ; Y Offset of scrolling
 
 OAMMIRROR   = $0400     ; location of OAMRAM mirror in WRAM, $220 bytes long
 ; ---
@@ -321,6 +321,7 @@ EndMovePlayer:
 ; could instead slide up all those bits into one byte and just see if it's all zero
 
 .proc CheckBGTilesAreWall
+    ; todo: need to handle 16 bits here
     lda BG_TILE1_IDX
     rep #$20            ; set A to 16-bit
     and #$00ff          ; clear high bits
@@ -467,12 +468,11 @@ EndCheckDirection:
     pha
     lda TARGET_Y1
     pha
-    lda #$00      ; blank byte for return value
-    pha
+    pea $0000      ;push blank 16-bits for return value
     jsr GetBGTileIdx
     ; pull a back and store it to BG_TILE1_IDX
-    pla
-    sta BG_TILE1_IDX
+    ply
+    sty BG_TILE1_IDX
     txs
 
     ; call GetBGTileIdx  for X2/Y2
@@ -481,12 +481,11 @@ EndCheckDirection:
     pha
     lda TARGET_Y2
     pha
-    lda #$00      ; blank byte for return value
-    pha
+    pea $0000      ;push blank 16-bits for return value
     jsr GetBGTileIdx
     ; pull a back and store it to BG_TILE2_IDX
-    pla
-    sta BG_TILE2_IDX
+    ply
+    sty BG_TILE2_IDX
     txs
 
     ; Now BG_TILE1_IDX and BG_TILE2_IDX are set
@@ -507,25 +506,27 @@ EndHandlePlayerDirection:
 
     ; constants to access args on stack with direct addressing
     TileIdx      = $07      ; return value
-    YPosition    = $08      ; Y position of 16x16 character sprite
-    XPosition    = $09      ; X position of 16x16 character sprite
+    YPosition    = $09      ; Y position of 16x16 character sprite
+    XPosition    = $0A      ; X position of 16x16 character sprite
 
+    rep #$20            ; set A to 16-bit
     lda YPosition
-    and #$f8                ; Clear lower 3 because we're shifting those away
+    and #$00f8                ; Clear lower 3 because we're shifting those away
     asl A
     asl A
     asl A
     pha                  ; push A
     lda XPosition        ; load x position into A
-    and #$f8
+    and #$00f8
     lsr A                ; Divide
     lsr A                ; by 4 - because we divide y 8 and then double
     clc
     adc $01, S          ; add y index to x index
     ; now A has the offset of the tile
     sta TileIdx
-    pla                 ; Pull off and discard pushed y-position so that stack is back on track, jack.
 
+    pla                 ; Pull off and discard pushed y-position so that stack is back on track, jack.
+    sep #$20            ; set A back to 8-bit
     ; subroutine cleanup and return
     pld                     ; pull back direct register
     plx                     ; restore old stack pointer into x
