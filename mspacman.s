@@ -321,7 +321,6 @@ EndMovePlayer:
 ; could instead slide up all those bits into one byte and just see if it's all zero
 
 .proc CheckBGTilesAreWall
-    .byte $42, $00
     lda BG_TILE1_IDX
     rep #$20            ; set A to 16-bit
     and #$00ff          ; clear high bits
@@ -329,15 +328,18 @@ EndMovePlayer:
     sep #$20            ; set A back to 8-bit
     lda Level1Map, X
     ; now tile 1 is in a
-    and #$f0        ; Check the top 4 bits of tile 1
-    bne FoundWall   ; if any of the top 4 bits are set, that tile is a wall tile
-    ; at this point, top 4 bits of tile 1 are zeroes (otherwise 'bne FoundWall' would have been taken)
+    sta BG_TILE1
     lda BG_TILE2_IDX
     rep #$20            ; set A to 16-bit
     and #$00ff          ; clear high bits
     tax                 ; transfer to X because X is an index register used for offset from Level1Map
     sep #$20        ; set A back to 8-bit
     lda Level1Map, X
+    ; now tile 2 is in A
+    sta BG_TILE2
+    and #$f0        ; Check the top 4 bits of tile 2
+    bne FoundWall   ; if any of the top 4 bits are set, that tile is a wall tile
+    lda BG_TILE1
     and #$f0        ; Check the top 4 bits of tile 1
     bne FoundWall   ; if any of the top 4 bits are set, that tile is a wall tile
     ; At this point, checked both BG_TILE#_IDX and found no wall
