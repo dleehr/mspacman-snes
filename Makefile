@@ -1,8 +1,8 @@
 mspacman.smc: mspacman.o memmap.cfg
-	ld65 -C memmap.cfg -o mspacman.smc mspacman.o
+	ld65 -C memmap.cfg -o mspacman.smc -Ln mspacman.cpu.sym mspacman.o
 
 mspacman.o: mspacman.s Sprites.vra mspacman.pal level1.pal Walls.vra level1.tlm
-	ca65 --cpu 65816 -s -o mspacman.o mspacman.s
+	ca65 --cpu 65816 -s -g -o mspacman.o mspacman.s
 
 Sprites.vra: bitplanes.py mspacman.chr
 	python3 bitplanes.py mspacman.chr Sprites.vra
