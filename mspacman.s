@@ -281,6 +281,11 @@ ProcessPlayerJoypadDirection:
     bne ProcessPlayerMomentumDirection  ; if non-zero, joypad movement headed player into a wall, ignore it
 CopyJoypadToMomentum:                   ; Joypad movement doesn't take player into a wall, copy it to momentum
     lda JOY1DIR
+    ; 2021-12-23 - so something is not right before this line. the JOY1DIR is being updated
+    ; but never copied into MOM1DIR. So the wall check is not working right when reading things
+    ; BG_IS_WALL is always returning 1.
+    ; I have a note to check 16 bit math there (    ; todo: need to handle 16 bits here)
+    ; so next I should look at CheckBGTilesAreWall
     sta MOM1DIR
     jmp EndProcessPlayerDirection       ; Just set MOM1DIR and have checked movement. OK to move...
     ; if so, update MOM1DIR and jump to move player
@@ -307,10 +312,48 @@ StopPlayerMovement:
 EndProcessPlayerDirection:
 BeginMovePlayer:
     ; Movement is good to go. read MOM1DIR and move player
-    ; read MOM1DIR and move player
+    jsr MovePlayer
 EndMovePlayer:
     jmp GameLoop
 .endproc
+
+.proc MovePlayer
+MoveCheckUp:
+    lda MOM1DIR
+    and #JOY_UP
+    beq MoveCheckDown
+    ; up was pressed....
+    lda PLAYER1_Y
+    dec
+    sta PLAYER1_Y
+    rts
+MoveCheckDown:
+    lda MOM1DIR
+    and #JOY_DOWN
+    beq MoveCheckLeft
+    lda PLAYER1_Y
+    inc
+    sta PLAYER1_Y
+    rts
+MoveCheckLeft:
+    lda MOM1DIR
+    and #JOY_LEFT
+    beq MoveCheckRight
+    lda PLAYER1_X
+    dec
+    sta PLAYER1_X
+    rts
+MoveCheckRight:
+    lda MOM1DIR
+    and #JOY_RIGHT
+    beq MoveCheckDone
+    lda PLAYER1_X
+    inc
+    sta PLAYER1_X
+MoveCheckDone:
+    rts
+.endproc
+
 ; ---
 
 ; Check tiles at BG_TILE1_IDX and BG_TILE2_IDX to see if player can enter them
